@@ -174,7 +174,7 @@ def plot_medial_evolute(pts, lambda_value, pt, outfile):
 
 
 
-lambda_val = 2
+lambda_val = .1
 n = 1000
 
 egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
@@ -190,10 +190,10 @@ pts_ellipse -= np.array([0,6])
 pts = np.array(pts_egg.tolist() + pts_ellipse.tolist())
 
 
-
+# make animation
 for i,x in enumerate(np.linspace(8, 4, 300)):
     print(i)
-    plot_medial_evolute(pts_egg, 0.1, [3, x], './anim/frame_{}.png'.format(str(i).zfill(4)))
+    plot_medial_evolute(pts_egg, lambda_val, [3, x], './anim/frame_{}.png'.format(str(i).zfill(4)))
 
 
 
