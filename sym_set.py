@@ -629,14 +629,14 @@ for tetra in dela.simplices:
 alpha_cmplx = np.array(alpha_cmplx)
 
 
-write_obj('vineyard0.obj', diag0s, alpha_cmplx)
-write_obj('vineyard1.obj', diag1s, [])
+write_obj('./objs/vineyard0.obj', diag0s, alpha_cmplx)
+write_obj('./objs/vineyard1.obj', diag1s, [])
 
 
 
 
 ############   3d example
-pts, simps = read_obj("/home/cfillmor/Downloads/moebius_boundary_2.obj")
+pts, simps = read_obj("./objs/moebius_boundary_2.obj")
 lambda_val = .4
 alpha = 1e-2
 height = 1e-3
@@ -707,7 +707,7 @@ for i, tetra in enumerate(dela.simplices):
 alpha_cmplx = np.array(alpha_cmplx)
 
 
-write_obj('vineyard2_3d.obj', diagXs, alpha_cmplx)
+write_obj('./objs/vineyard2_3d.obj', diagXs, alpha_cmplx)
 
 
 
