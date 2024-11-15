@@ -514,13 +514,14 @@ def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r'
         plt.show()
     return dgms
 
+##########################################################
+# Start various figure productions
+##########################################################
+
 
 lambda_val = .4
 n = 1000
 frames = 150
-
-2 \cos \theta
-(1+3/2 \cos^2(\theta/2)) \sin(\theta)
                 
 egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
 egg_y = lambda t: 4*np.sin(t)
