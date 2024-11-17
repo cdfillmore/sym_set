@@ -515,7 +515,7 @@ def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r'
     return dgms
 
 ##########################################################
-# Start various figure productions
+# Start various figure/animation productions
 ##########################################################
 
 
@@ -532,8 +532,8 @@ pts_egg += np.array([0,6])
 2 \cos \theta
 1+3/2 \cos^2(\theta/2)) \sin(\theta)
 '''
-potato_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
-potato_y = lambda t: 4*np.sin(t)
+potato_x = lambda t: 2*np.cos(t)
+potato_y = lambda t: (3/2)*np.cos(t/2)*np.cos(t/2)*np.sin(t)
 pts_potato = plot_parametric_2d(potato_x, potato_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
 pts_potato += np.array([0,6])
 
