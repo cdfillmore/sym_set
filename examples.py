@@ -1,13 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.spatial import Voronoi, Delaunay
-from scipy.spatial.distance import cdist
-import gudhi
-import itertools as it
-import os
-import collections
-import colorsys
-import igl
 from sym_set import *
 
 

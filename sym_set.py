@@ -1,3 +1,14 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial import Voronoi, Delaunay
+from scipy.spatial.distance import cdist
+import gudhi
+import itertools as it
+import os
+import collections
+import colorsys
+import igl
+
 def write_obj(path, verts, simps, name = "test.001"):
     dedup_tris = set([tuple(list(i)) for i in simps])
     dedup_tris = np.array(list(dedup_tris))
