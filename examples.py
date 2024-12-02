@@ -5,10 +5,12 @@ from sym_set import *
 # Start various figure/animation productions
 ##########################################################
 
+############   Draw sym set for 2d curves
+
 lambda_val = .4
 n = 1000
 frames = 150
-                
+
 egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
 egg_y = lambda t: 4*np.sin(t)
 pts_egg = plot_parametric_2d(egg_x, egg_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
@@ -32,6 +34,13 @@ pts_ellipse -= np.array([0,6])
 pts = np.array(pts_egg.tolist() + pts_ellipse.tolist())
 
 
+bumpy_x = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.cos(np.pi*t)
+bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
+pts_bumpy = plot_parametric_2d(bumpy_x, bumpy_y, [0, 2], num_points=n, title="2D Parametric Plot")[:-1]
+
+
+plot_medial_evolute(pts_bumpy, lambda_val, [0.1, 0.1], None)
+plot_medial_evolute(pts_egg, lambda_val, [0.1, 0.1], None)
 
 '''
 # old animations
@@ -119,14 +128,51 @@ write_obj('./objs/vineyard0.obj', diag0s, alpha_cmplx)
 write_obj('./objs/vineyard1.obj', diag1s, [])
 
 
-############   Creat 3d evolute obj
-name = "double_torus"
-ellipsoid = read_obj("./objs/{}.obj".format(name))
-focal1, focal2 = evolute_3d(*ellipsoid,radius=2)
-write_obj("./objs/{}_focal1.obj".format(name), focal1, ellipsoid[1], name="{}_focal_1".format(name))
-write_obj("./objs/{}_focal2.obj".format(name), focal2, ellipsoid[1], name="{}_focal_2".format(name))
+############   Create 3d egg
+n = 100
+u = np.linspace(-np.pi, np.pi, n)
+v = np.linspace(-np.pi, np.pi, n)
+uv = np.array(list(it.product(u,v)))
+x = (1+0.2*uv[:,1])*np.cos(uv[:,0])*np.sin(uv[:,1])
+y = (1+0.2*uv[:,1])*np.sin(uv[:,0])*np.sin(uv[:,1])
+z = 1.65*np.cos(uv[:,1])
+pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
+write_obj('objs/egg2.obj', pts, [], 'egg')
 
-######   Creat 3d evolute for saddle/extrema
+############   Create 3d ellipsoid
+n = 100
+u = np.linspace(-np.pi, np.pi, n)
+v = np.linspace(-np.pi, np.pi, n)
+uv = np.array(list(it.product(u,v)))
+a, b, c = 2/3, 1, 3/2 
+x = a*np.sin(uv[:,0])*np.cos(uv[:,1])
+y = b*np.sin(uv[:,0])*np.sin(uv[:,1])
+z = c*np.cos(uv[:,0])
+pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
+write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
+
+############   Creat 3d 0th + 1st medial axes + evolute obj
+name = "thickened_moebius_smoothed"
+file = "../sym_set/objs/{}.obj".format(name)
+out_file = "../sym_set/objs/{}".format(name)
+
+input = read_obj(file)
+focal1, focal2 = evolute_3d(*input,radius=2)
+write_obj("{}_focal1.obj".format(file), focal1, input[1], name="{}_focal_1".format(name))
+write_obj("{}_focal2.obj".format(file), focal2, input[1], name="{}_focal_2".format(name))
+
+alpha = 1
+Lambda = .8
+n = 1000
+sample = gen_sample_from_obj(file, n)
+#sample = read_obj(file)[0]   # for curves/knots/links
+pts, tris, v_pts, v_faces = approx_medial_axis(sample, False, False, alpha, Lambda, True, False)
+write_obj("{}_medial_0.obj".format(out_file), v_pts, v_faces, "{}_medial_0".format(name))
+pts, tris, v_pts, v_faces = approx_medial_axis(sample, False, False, alpha, Lambda, True, True)
+write_obj("{}_medial_1.obj".format(out_file), v_pts, v_faces, "{}_medial_1".format(name))
+
+
+######   Create 3d evolute for saddle/extrema
 x_bounds, xn = [-1,1] , 100
 y_bounds, yn = [-1,1] , 100
 x, y = np.meshgrid(np.linspace(*x_bounds, xn), np.linspace(*y_bounds, yn))
@@ -137,6 +183,7 @@ focal1, focal2 = evolute_3d(*obj,radius=2)
 write_obj("./objs/{}.obj".format(name), *obj, name="{}".format(name))
 write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1".format(name))
 write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
+
 
 ############   3d example
 pts, simps = read_obj("./objs/moebius_boundary_2.obj")
@@ -211,3 +258,35 @@ alpha_cmplx = np.array(alpha_cmplx)
 
 
 write_obj('./objs/vineyard2_3d.obj', diagXs, alpha_cmplx)
+
+
+
+
+
+
+
+################################################################
+# make alpha complex
+alpha = 0.05
+dela = spa.Delaunay(sample)
+combos = np.array([sorted(list(it.combinations(i,3))) for i in dela.simplices])
+combos = combos.reshape((len(combos)*4,3)).tolist()
+tris = [list(i) for i in set([ tuple(i) for i in [sorted(j) for j in combos]])]
+
+
+dtris = np.array([ j for j in tris if circumsphere_3d(sample[j])[1] < alpha])
+write_obj("../sym_set/objs/sample.obj", sample, dtris)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

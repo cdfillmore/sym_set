@@ -8,6 +8,8 @@ import os
 import collections
 import colorsys
 import igl
+from georg_miniball3d import circumsphere_3d
+import random as rd
 
 def write_obj(path, verts, simps, name = "test.001"):
     dedup_tris = set([tuple(list(i)) for i in simps])
@@ -364,10 +366,14 @@ def plot_medial_evolute(pts, lambda_value, pt, outfile=None, col0='b', col1='r',
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(35, 15))
     
+    max_dist = np.apply_along_axis(np.linalg.norm, 1, pts).max()
     for evo in evos:
         colour_range = [colorsys.hsv_to_rgb(x,1,1) for x in np.linspace(0,1,len(evo))]
         for i in range(len(evo)):
-            ax1.plot(evo.T[0][np.r_[(i-2):i]], evo.T[1][np.r_[(i-2):i]], color=colour_range[i]) #, label='Evolute')
+            if distance([evo[np.r_[i-1]], evo[np.r_[i]]]) > max_dist:
+                continue
+            else:
+                ax1.plot(evo.T[0][np.r_[(i-2):i]], evo.T[1][np.r_[(i-2):i]], color=colour_range[i]) #, label='Evolute')
     '''
     jump_indices = [i for i in range(len(evo)) if distance((evo[i], evo[(i+1)%len(evo)])) > 5]
     k=0
@@ -461,6 +467,7 @@ def plot_medial_evolute(pts, lambda_value, pt, outfile=None, col0='b', col1='r',
     else:
         fig.savefig(outfile, dpi=180)
     plt.close(fig)  # Close the figure to free up memory
+
     return dgms
 
 # build extended Persistence diagram
@@ -503,8 +510,76 @@ def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r'
         plt.show()
     return dgms
 
+def dist(x, y):
+    return np.sqrt( np.sum( np.square(y-x) ) )
 
+def triangulate(face):
+    tris = []
+    for i in range(1,len(face)-1):
+        tris += [[face[0], face[i], face[i+1]]]
+    #tris += [[face[0],face[-1],face[1]]]
+    return tris
 
+def approx_medial_axis(input, MAX, z_max, alpha, LAMBDA, exp_tris, farthest):
+    if type(input) == str:
+        pts = read_obj(input)[0]
+    else:
+        pts = input
+    colours = []
+    pts = np.array(pts) + 1e-4*(np.random.rand(len(pts),3)-.5)
+    
+    
+    voronoi = Voronoi(pts, furthest_site=farthest)
+    print("done voronoi")
+    delaunay = Delaunay(pts)
+    print("done delaunay")
+    
+    dtris = set([])
+    for i in delaunay.simplices:
+        dtris.update([ j for j in it.combinations(i,3) if circumsphere_3d(pts[i])[1] < alpha])
+    dtris = np.array([list(i) for i in dtris], dtype=np.int32)
+    print("done alpha")
+    
+    bad_v = []
+    if MAX:
+        bad_v += [i for i,j in enumerate(voronoi.vertices) if dist(j,[0,0,0])>MAX]
+    if z_max:
+        bad_v += [i for i,j in enumerate(voronoi.vertices) if (np.abs(j[2]) > z_max)]
+    
+    bad_v = list(set(bad_v))
+    
+    faces = []
+    for i in voronoi.ridge_dict:
+        if -1 in voronoi.ridge_dict[i]:
+            continue
+        elif dist(pts[i[0]], pts[i[1]]) > LAMBDA:
+            if len(np.intersect1d(voronoi.ridge_dict[i], bad_v, assume_unique = True)) == 0:
+                if exp_tris:
+                    faces += triangulate(voronoi.ridge_dict[i])
+                else:
+                    faces += [voronoi.ridge_dict[i]] 
+    print("done lambda + limit")
+    return [pts, dtris, voronoi.vertices, faces]
+
+def area_tri(tri):
+    a = dist(tri[0], tri[1])
+    b = dist(tri[0], tri[2])
+    c = dist(tri[1], tri[2])
+    s = (a+b+c)/2
+    return np.sqrt(s*(s-a)*(s-b)*(s-c))
+
+def gen_sample_from_obj(file, num_pts):
+    pts, simps = read_obj(file)
+    samples = []
+    areas = np.array([area_tri(pts[i]) for i in simps])
+    areas = areas/areas.sum()
+    for simp_id in list(rd.choices(range(len(simps)), areas, k=num_pts)):
+        simp = simps[simp_id]
+        r1 = np.random.rand()
+        r2 = np.random.rand()
+        temp = (1 - np.sqrt(r1))*pts[simp[0]] + np.sqrt(r1)*(1 - r2)*pts[simp[1]] + r2*np.sqrt(r1)*pts[simp[2]]
+        samples.append( temp )
+    return np.array(samples)
 
 
 
