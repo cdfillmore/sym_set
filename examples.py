@@ -184,6 +184,14 @@ write_obj("./objs/{}.obj".format(name), *obj, name="{}".format(name))
 write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1".format(name))
 write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
 
+### e tries the dumbbell
+name = "dumbbell"
+obj = read_obj("./objs/dumbbell.obj")
+focal1, focal2 = evolute_3d(*obj,radius=2)
+write_obj("./objs/{}.obj".format(name), *obj, name="{}".format(name))
+write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1".format(name))
+write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
+
 
 ############   3d example
 pts, simps = read_obj("./objs/moebius_boundary_2.obj")
