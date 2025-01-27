@@ -152,24 +152,24 @@ pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
 ############   Creat 3d 0th + 1st medial axes + evolute obj
-name = "thickened_moebius_smoothed"
+name = "torus_test"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 
 input = read_obj(file)
 focal1, focal2 = evolute_3d(*input,radius=2)
-write_obj("{}_focal1.obj".format(file), focal1, input[1], name="{}_focal_1".format(name))
-write_obj("{}_focal2.obj".format(file), focal2, input[1], name="{}_focal_2".format(name))
+write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".format(name))
+write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
 
 alpha = 1
-Lambda = .8
+Lambda = .75
 n = 1000
 sample = gen_sample_from_obj(file, n)
 #sample = read_obj(file)[0]   # for curves/knots/links
 pts, tris, v_pts, v_faces = approx_medial_axis(sample, False, False, alpha, Lambda, True, False)
 write_obj("{}_medial_0.obj".format(out_file), v_pts, v_faces, "{}_medial_0".format(name))
 pts, tris, v_pts, v_faces = approx_medial_axis(sample, False, False, alpha, Lambda, True, True)
-write_obj("{}_medial_1.obj".format(out_file), v_pts, v_faces, "{}_medial_1".format(name))
+write_obj("{}_medial_2.obj".format(out_file), v_pts, v_faces, "{}_medial_1".format(name))
 
 
 ######   Create 3d evolute for saddle/extrema
