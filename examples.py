@@ -152,7 +152,7 @@ pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
 ############   Creat 3d 0th + 1st medial axes + evolute obj
-name = "dumbbell"
+name = "bunny2"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 
@@ -162,8 +162,8 @@ write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".
 write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
 
 alpha = 1
-Lambda = .25
-n = 5000
+Lambda = .05
+n = 10000
 sample = gen_sample_from_obj(file, n)
 #sample = read_obj(file)[0]   # for curves/knots/links
 pts, tris, v_pts, v_faces = approx_medial_axis(sample, False, False, alpha, Lambda, True, False)
@@ -194,18 +194,20 @@ write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2"
 
 
 ############   3d example
-pts, simps = read_obj("./objs/moebius_boundary_2.obj")
+name = "ouroboiiX2_rot"
+pts, simps = read_obj("objs/{}.obj".format(name))
+fig8 = read_obj_curve("objs/fig8.obj")
 lambda_val = .4
-alpha = 1e-2
-height = 1e-3
-frames = 500
+alpha = 1e-1
+height = 0.016891891891891893
+frames = len(fig8)
 circ_x = lambda t: 0.125*np.cos(t)
 circ_y = lambda t: 0.125*np.sin(t)
 circle = plot_parametric_2d(circ_x, circ_y, [0, 6*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 #circle += np.array([-0.174193, 0.162457])
 # make animation
 dgms_all = []
-for i,y in enumerate(circle):
+for i,y in enumerate(fig8):
     print(i)
     x = np.array([y[0], y[1], 0])
     dgms_all += [plot_extended_persistence3d(pts, simps, x, None, 'b', 'r', 'g')]
@@ -241,10 +243,13 @@ diag0s = np.array(diag0s)
 diag1s = np.array(diag1s)
 diag2s = np.array(diag2s)
 
+diagss = [diag0s, diag1s, diag2s]
+
+deg = 2
 suppress = 0
 visited = {}
 alpha_cmplx = []
-diagXs = diag2s
+diagXs = diagss[deg]
 dela = Delaunay(diagXs)
 for i, tetra in enumerate(dela.simplices):
     if int(i*100/len(dela.simplices))%5 == 0:
@@ -265,7 +270,7 @@ for i, tetra in enumerate(dela.simplices):
 alpha_cmplx = np.array(alpha_cmplx)
 
 
-write_obj('./objs/vineyard2_3d.obj', diagXs, alpha_cmplx)
+write_obj('./objs/{}_vines_{}.obj'.format(name, deg), diagXs, alpha_cmplx, "{}_vines_{}".format(name, deg))
 
 
 
