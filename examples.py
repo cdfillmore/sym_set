@@ -151,8 +151,8 @@ z = c*np.cos(uv[:,0])
 pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
-############   Creat 3d 0th + 1st medial axes + evolute obj
-name = "bunny2"
+############   Create 3d 0th + 1st medial axes + evolute obj
+name = "elliptic_paraboloid"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 
@@ -162,7 +162,7 @@ write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".
 write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
 
 alpha = 1
-Lambda = .05
+Lambda = .2
 n = 10000
 sample = gen_sample_from_obj(file, n)
 #sample = read_obj(file)[0]   # for curves/knots/links
@@ -180,6 +180,19 @@ z = x**3 - 3*x*y**2
 name = "monkey_saddle"
 obj = create_mesh_from_arrays(x,y,z)
 focal1, focal2 = evolute_3d(*obj,radius=2)
+write_obj("./objs/{}.obj".format(name), *obj, name="{}".format(name))
+write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1".format(name))
+write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
+
+######   Create 3d evolute for elliptic paraboloid
+from sym_set import *
+r, theta = x, y = np.meshgrid(np.linspace(0, .5, 50), np.linspace(0, 2*np.pi, 10))
+x,y = r*np.cos(theta), r*np.sin(theta)
+a, b = 3/2, 1
+z = (x**2)/(a**2) + (y**2)/(b**2)
+name = "elliptic_paraboloid"
+obj = create_mesh_from_arrays(x,y,z)
+focal1, focal2 = evolute_3d(*obj,radius=10)
 write_obj("./objs/{}.obj".format(name), *obj, name="{}".format(name))
 write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1".format(name))
 write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
