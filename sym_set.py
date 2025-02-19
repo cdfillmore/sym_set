@@ -581,11 +581,94 @@ def gen_sample_from_obj(file, num_pts):
         samples.append( temp )
     return np.array(samples)
 
+def compute_normals_and_curvature(x_t, y_t, t_values):
+    """
+    Compute the vertex normals and curvature of a 2D curve.
+    
+    Parameters:
+    - x_t: function representing the x-component of the curve as a function of t
+    - y_t: function representing the y-component of the curve as a function of t
+    - t_values: array of t-values at which to compute the normals and curvature
+    
+    Returns:
+    - normals: Array of normal vectors at each t-value
+    - curvatures: Array of curvatures at each t-value
+    """
+    # Initialize arrays for normals and curvatures
+
+    
+    # First derivative (tangent vector)
+    dx_dts = np.gradient(np.apply_along_axis(x_t, 0, t_values))
+    dy_dts = np.gradient(np.apply_along_axis(y_t, 0, t_values))
+
+    # Second derivative (rate of change of the tangent vector)
+    d2x_dt2 = np.gradient(dx_dts)
+    d2y_dt2 = np.gradient(dy_dts)
+    tangent = np.array([dx_dts, dy_dts]).T
+    normal = np.array([-dy_dts, dx_dts]).T
+    normal = np.apply_along_axis(lambda x: x/np.linalg.norm(x), 1, normal)
+
+    # Compute the curvature
+    numerator = np.abs(dx_dts * d2y_dt2 - dy_dts * d2x_dt2)
+    denominator = (dx_dts**2 + dy_dts**2)**(3/2)
+    curvature = numerator / denominator
+    
+    return np.array(normal), np.array(curvature)
+
+# there can be a problem if the link pinches in a vertex
+def get_cyclic_link(vertex, network, faces, link_radius):
+    
+    star = {vertex}
+    for i in range(link_radius):
+        new_star = set([])
+        for j in star:
+            new_star.update(network[j])
+        old_star = star
+        star = new_star
+    unordered_link = list(star.difference(old_star))
+
+    if len(unordered_link) <= 3:
+        return unordered_link
+    else:
+        ordered_link = [unordered_link[0]]
+        current = unordered_link[0]
+        next_verts = list(set(network[current]).intersection(unordered_link).difference(ordered_link))
+        while len(next_verts) > 0:
+            # necessary for coarse meshes, assume fine mesh
+            '''
+            if len(next_verts) > 1:
+                for vert in next_verts:
+                    if sorted([vertex, current, vert]) in faces:
+                        ordered_link.append(vert)
+                        current = vert
+                        break
+            else:
+                ordered_link.append(next_verts[0])
+                current = next_verts[0]
+            '''
+            ordered_link.append(next_verts[0])
+            current = next_verts[0]
+            next_verts = list(set(network[current]).intersection(unordered_link).difference(ordered_link))
+        return ordered_link
 
 
-
-
-
+# generate line bundle volume in 4d
+'''
+r = 5
+pts, faces = read_obj("./ellipsoid3_test3.obj")
+norms = igl.per_vertex_normals(pts, faces)
+adj = igl.adjacency_list(faces)
+d1, d2, k1, k2 = igl.principal_curvature(pts, faces, 5)
+for i, pt in enumerate(pts):
+    link_i = get_cyclic_link(i, adj, faces, 1)
+    for j, pt_j in enumerate(link_i):
+        D4_pt_0 = np.array(pt.tolist() + [0])
+        D4_pt_1 = np.array(pts[link_i[j]] + [0])
+        D4_pt_2 = np.array(pts[link_i[(j+1)%len(link_i)]] + [0])
+        D4_pt_3 = np.array((pt + (r/k1[i])*norms[i]).tolist() + [(r/k1[i])])
+        D4_pt_4 = np.array((pts[link_i[j]] + (r/k1[link_i[j]])*norms[link_i[j]]).tolist() + [(r/k1[link_i[j]])])
+        D4_pt_5 = np.array((pts[link_i[(j+1)%len(link_i)]] + (r/k1[link_i[(j+1)%len(link_i)]])*norms[link_i[(j+1)%len(link_i)]]).tolist() + [(r/k1[link_i[(j+1)%len(link_i)]])])
+'''
 
 
 

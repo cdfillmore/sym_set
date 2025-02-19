@@ -60,6 +60,39 @@ pts_circ = plot_parametric_2d(circ_x, circ_y, [-np.pi, np.pi], num_points=frames
 pts_circ += np.array([1.1, 1.5])
 '''
 
+############    make line bundle surface from curve
+
+#circ_x = lambda t: 1.2*np.cos(t)
+#circ_y = lambda t: 1*np.sin(t)
+#obj = plot_parametric_2d(circ_x, circ_y, [0, 2*np.pi], num_points=n, title="2D Parametric Plot")[:-1]
+egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
+egg_y = lambda t: 4*np.sin(t)
+bumpy_x = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.cos(np.pi*t)
+bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
+name_x, name_y = egg_x, egg_y
+n = 1000
+l=100
+obj = plot_parametric_2d(name_x, name_y, [0, 2*np.pi], num_points=n, title="2D Parametric Plot")[:-1]
+normals, curvature = compute_normals_and_curvature(name_x, name_y, np.linspace(0, 2*np.pi,n))
+e = evolute(obj, np.inf, False)
+pts1, pts2, faces1, faces2 = [], [], [], []
+for i, (pt, norm, curv) in enumerate(zip(obj, normals, curvature)):
+    #print(i)
+    #pt_0 = pt.tolist() + [0]
+    #pt_1 = obj[(i+1)%(n-1)].tolist() + [0]
+    pt_0 = (pt - (1/curv)*norm).tolist() + [-1/curv]
+    pt_1 = (obj[(i+1)%(n-1)] - (1/curvature[(i+1)%(n-1)])*normals[(i+1)%(n-1)]).tolist() + [-1/curvature[(i+1)%(n-1)]]
+    pt_2 = (obj[(i+1)%(n-1)] + (1/curvature[(i+1)%(n-1)])*normals[(i+1)%(n-1)]).tolist() + [1/curvature[(i+1)%(n-1)]]
+    pt_3 = (pt + (1/curv)*norm).tolist() + [1/curv]
+    pt_4 = ((l/curv)*norm + pt).tolist() + [l/curv]
+    pt_5 = ((l/curvature[(i+1)%(n-1)])*normals[(i+1)%(n-1)] + obj[(i+1)%(n-1)]).tolist() + [l/curvature[(i+1)%(n-1)]]
+    n1, n2 = i*4, i*4
+    faces1.append([n1, n1+1, n1+2, n1+3])
+    faces2.append([n2, n2+1, n2+2, n2+3])
+    pts1 += [pt_0, pt_1, pt_2, pt_3]
+    pts2 += [pt_2, pt_3, pt_4, pt_5]
+write_obj("./objs/medial_0_faces.obj", pts1, faces1, "medial_0_faces")
+write_obj("./objs/medial_1_faces.obj", pts2, faces2, "medial_1_faces")
 
 
 ############   2d example
