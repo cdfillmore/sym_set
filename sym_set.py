@@ -472,7 +472,10 @@ def plot_medial_evolute(pts, lambda_value, pt, outfile=None, col0='b', col1='r',
 
 # build extended Persistence diagram
 def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r', col2='g'):
-    d = max([len(i) for i in simps])
+    if len(simps) > 0:
+        d = max([len(i) for i in simps])
+    else:
+        d = 0
     cplx = gudhi.SimplexTree()
     cplx.set_dimension(d)
     for i, v in enumerate(pts):
@@ -487,14 +490,17 @@ def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r'
     diag0 = np.array([ i[1] for i in flat_dgms if i[0]==0])
     diag1 = np.array([ i[1] for i in flat_dgms if i[0]==1])
     diag2 = np.array([ i[1] for i in flat_dgms if i[0]==2])
+
     max_births, max_deaths = max([ i[1][0] for i in flat_dgms]), max([ i[1][1] for i in flat_dgms])
     max_diag = max(max_births, max_deaths)
 
     #gudhi.plot_persistence_diagram(cplx.persistence(), axes=ax2)
     plt.plot([0, max_diag], [0, max_diag], color='k', label = 'Diagonal')
     plt.scatter(diag0.T[0], diag0.T[1], color=col0, label='0th Diagram')
-    plt.scatter(diag1.T[0], diag1.T[1], color=col1, label='1st Diagram')
-    plt.scatter(diag2.T[0], diag2.T[1], color=col2, label='2nd Diagram')
+    if d>1:
+        plt.scatter(diag1.T[0], diag1.T[1], color=col1, label='1st Diagram')
+    if d>2:
+        plt.scatter(diag2.T[0], diag2.T[1], color=col2, label='2nd Diagram')
     plt.legend(loc='lower right')
     #plt.set_title('Persistence Diagram')
     #plt.set_xlabel('Birth')

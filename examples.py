@@ -185,7 +185,7 @@ pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
 ############   Create 3d 0th + 1st medial axes + evolute obj
-name = "elliptic_paraboloid"
+name = "cup4"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 
@@ -195,7 +195,7 @@ write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".
 write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
 
 alpha = 1
-Lambda = .2
+Lambda = .09
 n = 10000
 sample = gen_sample_from_obj(file, n)
 #sample = read_obj(file)[0]   # for curves/knots/links
@@ -240,20 +240,22 @@ write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2"
 
 
 ############   3d example
-name = "ouroboiiX2_rot"
-pts, simps = read_obj("objs/{}.obj".format(name))
-fig8 = read_obj_curve("objs/fig8.obj")
+name = "over_crossing"
+#pts, simps = read_obj("objs/{}.obj".format(name))
+pts = read_obj_curve(f"objs/{name}.obj")
+simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
+obsv_curve = read_obj_curve("objs/circle1.obj")
 lambda_val = .4
 alpha = 1e-1
 height = 0.016891891891891893
-frames = len(fig8)
+frames = len(obsv_curve)
 circ_x = lambda t: 0.125*np.cos(t)
 circ_y = lambda t: 0.125*np.sin(t)
-circle = plot_parametric_2d(circ_x, circ_y, [0, 6*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
+#circle = plot_parametric_2d(circ_x, circ_y, [0, 6*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 #circle += np.array([-0.174193, 0.162457])
 # make animation
 dgms_all = []
-for i,y in enumerate(fig8):
+for i,y in enumerate(obsv_curve):
     print(i)
     x = np.array([y[0], y[1], 0])
     dgms_all += [plot_extended_persistence3d(pts, simps, x, None, 'b', 'r', 'g')]
@@ -273,14 +275,14 @@ for i,dgm in enumerate(dgms_all):
     print(i)
     flat_dgm = [item for sublist in dgm for item in sublist]
     diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
-    diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
-    diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
+    #diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
+    #diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
     diag0s += np.hstack((diag0, i*height*np.ones([len(diag0),1]))).tolist()
-    diag1s += np.hstack((diag1, i*height*np.ones([len(diag1),1]))).tolist()
-    diag2s += np.hstack((diag2, i*height*np.ones([len(diag2),1]))).tolist()
+    #diag1s += np.hstack((diag1, i*height*np.ones([len(diag1),1]))).tolist()
+    #diag2s += np.hstack((diag2, i*height*np.ones([len(diag2),1]))).tolist()
     plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
-    plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
-    plt.scatter(diag2.T[0], diag2.T[1], color=col2s[i])
+    #plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
+    #plt.scatter(diag2.T[0], diag2.T[1], color=col2s[i])
 plt.axis('equal')
 plt.grid(True)
 plt.show()
@@ -289,9 +291,9 @@ diag0s = np.array(diag0s)
 diag1s = np.array(diag1s)
 diag2s = np.array(diag2s)
 
-diagss = [diag0s, diag1s, diag2s]
+diagss = [diag0s]#, diag1s, diag2s]
 
-deg = 2
+deg = 0
 suppress = 0
 visited = {}
 alpha_cmplx = []
