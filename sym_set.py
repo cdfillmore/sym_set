@@ -475,7 +475,7 @@ def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r'
     if len(simps) > 0:
         d = max([len(i) for i in simps])
     else:
-        d = 0
+        d = 1
     cplx = gudhi.SimplexTree()
     cplx.set_dimension(d)
     for i, v in enumerate(pts):

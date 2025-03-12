@@ -240,13 +240,13 @@ write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2"
 
 
 ############   3d example
-name = "over_crossing"
+name = "under_crossing4"
 #pts, simps = read_obj("objs/{}.obj".format(name))
 pts = read_obj_curve(f"objs/{name}.obj")
 simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
 obsv_curve = read_obj_curve("objs/circle1.obj")
 lambda_val = .4
-alpha = 5e-1
+alpha = 5e-2
 height = 0.016891891891891893
 frames = len(obsv_curve)
 circ_x = lambda t: 0.125*np.cos(t)
@@ -257,8 +257,8 @@ circ_y = lambda t: 0.125*np.sin(t)
 dgms_all = []
 for i,y in enumerate(obsv_curve):
     print(i)
-    x = np.array([y[0], y[1], 0])
-    dgms_all += [plot_extended_persistence3d(pts, simps, x, None, 'b', 'r', 'g')]
+    #x = np.array([y[0], y[1], 0])
+    dgms_all += [plot_extended_persistence3d(pts, simps, y, None, 'b', 'r', 'g')]
 #os.system("ffmpeg -framerate 30 -pattern_type glob -i './anim4/*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence_worm.mp4")
 
 col0s = [colorsys.hsv_to_rgb(0.,1,j) for j in np.linspace(0.5,0.9,frames)]
