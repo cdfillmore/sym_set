@@ -64,16 +64,20 @@ def read_obj_curve(path):
 			elif line[0] == 'l':
 				simps += [[ int(i)-1 for i in line.strip('\n').strip(' ').split(' ')[1:3]]]
 	pts = np.array(pts)
-	graph = {i:[] for i in range(len(simps))}
+	graph = {i:[] for i in range(len(pts))}
 	for i,j in simps:
 		graph[i].append(j)
 		graph[j].append(i)
 	out_indices = [0, graph[0][0]]
+	#print(graph)
 	while out_indices[-1] != 0:
 		current = out_indices[-1]
 		old = out_indices[-2]
-		new = list(set(graph[current]).difference([old]))[0]
-		out_indices.append(new)
+		try:
+			new = list(set(graph[current]).difference([old]))[0]
+			out_indices.append(new)
+		except:
+			break
 	return pts[out_indices]
 
 def make_curve2d(curve, noise=None):

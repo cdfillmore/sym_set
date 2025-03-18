@@ -240,13 +240,13 @@ write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2"
 
 
 ############   3d example
-name = "under_crossing4"
+name = "twist_4"
 #pts, simps = read_obj("objs/{}.obj".format(name))
-pts = read_obj_curve(f"objs/{name}.obj")
+pts = read_obj_curve(f"objs/{name}.obj")[:-1]
 simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
-obsv_curve = read_obj_curve("objs/circle1.obj")
+obsv_curve = read_obj_curve("objs/circle5.obj")
 lambda_val = .4
-alpha = 5e-2
+alpha = 1e-2
 height = 0.016891891891891893
 frames = len(obsv_curve)
 circ_x = lambda t: 0.125*np.cos(t)
@@ -299,6 +299,7 @@ visited = {}
 alpha_cmplx = []
 diagXs = diagss[deg]
 dela = Delaunay(diagXs)
+write_obj("./objs/blah.obj", diagXs, [], 'test')
 for i, tetra in enumerate(dela.simplices):
     if int(i*100/len(dela.simplices))%5 == 0:
         if suppress == 0:
