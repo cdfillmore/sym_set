@@ -333,6 +333,88 @@ def compute_2d_lambda_medial_axis(points, lambda_value, farthest=False):
         lambda_ma_vertices = np.empty([0,3])
     return vertices, lambda_ma_vertices, lambda_ma_edges
 
+def compute_tangents(vertices):
+    """
+    Compute unit tangent vectors for a closed 3D curve using central differences.
+    
+    Args:
+        vertices: NumPy array of shape (N, 3).
+    
+    Returns:
+        tangents: Unit tangent vectors, shape (N, 3).
+    """
+    # Roll vertices to compute forward/backward differences
+    next_vertices = np.roll(vertices, -1, axis=0)
+    prev_vertices = np.roll(vertices, 1, axis=0)
+    
+    # Central difference approximation
+    tangents = next_vertices - prev_vertices
+    
+    # Normalize tangents
+    norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+    norms[norms == 0] = 1  # Avoid division by zero (for duplicate vertices)
+    tangents_normalized = tangents / norms
+    
+    return tangents_normalized
+
+def triangulate_sphere(R=1.0, subdivisions=2):
+    """Generate a triangulated 3D sphere (returns vertices and faces)."""
+    # Use icosphere for uniform triangulation
+    from icosphere import icosphere  # Install: pip install icosphere
+    vertices, faces = icosphere(subdivisions)
+    vertices *= R  # Scale by radius
+    return vertices, faces
+
+def stitch_spheres(n_spheres, base_sphere_verts, base_sphere_faces):
+    """Connect adjacent spheres with triangles."""
+    new_faces = []
+    verts_per_sphere = len(base_sphere_verts)
+    for i in range(n_spheres):
+        for tri in base_sphere_faces:
+            tet1 = [ i * verts_per_sphere + k for k in tri] + [((i + 1)%n_spheres) * verts_per_sphere + tri[0]]
+            tet2 = [ ((i + 1)%n_spheres) * verts_per_sphere + k for k in tri] + [i * verts_per_sphere + tri[1]]
+            tet3 = [ i * verts_per_sphere + tri[1], i * verts_per_sphere + tri[2]] + [((i + 1)%n_spheres) * verts_per_sphere + tri[2], ((i + 1)%n_spheres) * verts_per_sphere + tri[0]]
+            new_faces.extend([tet1, tet2, tet3])
+    return np.array(new_faces)
+
+def create_tubular_nbhd_4d(curve, r, m):
+    """Generate a tubular neighborhood in 4D.
+    Args:
+        curve: List of 3D vertices [(x1,y1,z1), (x2,y2,z2), ...].
+        r: Tube radius.
+        m: Number of subdivisions to the icosphere.
+    Returns:
+        4D points forming the tube surface.
+    """
+    n = len(curve)
+    curve = np.hstack([curve, np.zeros([n,1])])
+    tangents = compute_tangents(curve)
+
+    # Step 2: Triangulate a base sphere (3D)
+    base_sphere_verts, base_sphere_faces = triangulate_sphere(r, subdivisions=m)
+
+    # Step 3: Transform spheres to 4D and stitch
+    all_vertices = []
+    for i in range(len(curve)):
+        T = tangents[i]
+        N1 = np.array([-T[1], T[0], 0, 0])  # Orthogonal basis
+        N2 = np.array([0, 0, 1, 0])
+        N3 = np.array([0, 0, 0, 1])
+
+        # Transform base sphere to 4D
+        sphere_verts_4d = curve[i] + (
+            base_sphere_verts[:, 0:1] * N1 +
+            base_sphere_verts[:, 1:2] * N2 +
+            base_sphere_verts[:, 2:3] * N3
+        )
+        all_vertices.append(sphere_verts_4d)
+    
+    all_faces = stitch_spheres(n, base_sphere_verts, base_sphere_faces)
+
+    return np.vstack(all_vertices), all_faces
+
+    
+
 # prints the evolute and medial axes for input of multiple curves
 # first curve goes to pts additional (curve, lambda) pairs can be added to args
 def plot_medial_evolute(pts, lambda_value, pt, outfile=None, col0='b', col1='r', *args):

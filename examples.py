@@ -345,10 +345,50 @@ write_obj("../sym_set/objs/sample.obj", sample, dtris)
 
 
 
+################################################################
+# make 4d offset diagrams
+################################################################
+d = 4
+cplx = gudhi.SimplexTree()
+cplx.set_dimension(d)
+pts = read_obj_curve("./objs/curve_fig3.obj")
+pts = np.array([pts.T[0], pts.T[2], pts.T[1]]).T
+tube_pts, tube_tets = create_tubular_nbhd_4d(pts, 0.05, 1)
+for i, v in enumerate(tube_pts):
+    cplx.insert([i], filtration=tube_pts[i][1])
+for simp in tube_tets:
+    cplx.insert(simp, filtration=max([cplx.filtration([i]) for i in simp]))
+#cplx.make_filtration_non_decreasing()
+cplx.extend_filtration()
+dgms = cplx.extended_persistence()#persistence_dim_max=2)
 
+flat_dgms = [item for sublist in dgms for item in sublist]
+diag0 = np.array([ i[1] for i in flat_dgms if i[0]==0])
+diag1 = np.array([ i[1] for i in flat_dgms if i[0]==1])
+diag2 = np.array([ i[1] for i in flat_dgms if i[0]==2])
+diag3 = np.array([ i[1] for i in flat_dgms if i[0]==3])
+max_births, max_deaths = max([ i[1][0] for i in flat_dgms]), max([ i[1][1] for i in flat_dgms])
+min_births, min_deaths = min([ i[1][0] for i in flat_dgms]), min([ i[1][1] for i in flat_dgms])
+max_diag = max(max_births, max_deaths)
+min_diag = min(min_births, min_deaths)
 
-
-
-
+fig = plt.figure()
+ax2 = fig.add_subplot()
+col0, col1, col2, col3 = 'b', 'r', 'g', 'm'
+ax2.plot([min_diag, max_diag], [min_diag, max_diag], color='k', label = 'Diagonal')
+ax2.scatter(diag0.T[0], diag0.T[1], color=col0, label='0th Diagram')
+ax2.scatter(diag1.T[0], diag1.T[1], color=col1, label='1st Diagram')
+ax2.scatter(diag2.T[0], diag2.T[1], color=col2, label='2nd Diagram')
+#ax2.scatter(diag3.T[0], diag3.T[1], color=col3, label='3rd Diagram')
+ax2.legend(loc='lower right')
+ax2.set_title('Persistence Diagram')
+ax2.set_xlabel('Birth')
+ax2.set_ylabel('Death')
+ax2.axis('equal')
+ax2.grid(True)
+ax2.legend()
+ax2.set_xlim([min_diag, max_diag])
+ax2.set_ylim([min_diag, max_diag])
+plt.show()
 
 
