@@ -244,45 +244,50 @@ name = "twist_4"
 #pts, simps = read_obj("objs/{}.obj".format(name))
 pts = read_obj_curve(f"objs/{name}.obj")[:-1]
 simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
-obsv_curve = read_obj_curve("objs/circle5.obj")
+obsv_curve = read_obj_curve("objs/obsv_loop.obj")
 lambda_val = .4
 alpha = 5e-2
 height = 0.016891891891891893
 frames = len(obsv_curve)
-circ_x = lambda t: 0.125*np.cos(t)
-circ_y = lambda t: 0.125*np.sin(t)
+#circ_x = lambda t: 0.125*np.cos(t)
+#circ_y = lambda t: 0.125*np.sin(t)
 #circle = plot_parametric_2d(circ_x, circ_y, [0, 6*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 #circle += np.array([-0.174193, 0.162457])
 # make animation
-dgms_all = []
+dgms_all1 = []
+dgms_all2 = []
 for i,y in enumerate(obsv_curve):
     print(i)
     #x = np.array([y[0], y[1], 0])
-    dgms_all += [plot_extended_persistence3d(pts, simps, y, None, 'b', 'r', 'g')]
+    dgms_all1 += [plot_extended_persistence3d(pts1, simps1, y, None, 'b', 'r', 'g')]
+    dgms_all2 += [plot_extended_persistence3d(pts2, simps2, y, None, 'b', 'r', 'g')]
 #os.system("ffmpeg -framerate 30 -pattern_type glob -i './anim4/*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence_worm.mp4")
 
 col0s = [colorsys.hsv_to_rgb(0.,1,j) for j in np.linspace(0.5,0.9,frames)]
 col1s = [colorsys.hsv_to_rgb(1/3,1,j) for j in np.linspace(0.5,0.9,frames)]
 col2s = [colorsys.hsv_to_rgb(2/3,1,j) for j in np.linspace(0.5,0.9,frames)]
-flat_dgms_all = [[item for sublist in dgm for item in sublist] for dgm in dgms_all]
-max_births, max_deaths = max([max([ i[1][0] for i in flat_dgm]) for flat_dgm in flat_dgms_all]), max([max([ i[1][1] for i in flat_dgm]) for flat_dgm in flat_dgms_all])
-max_diag = max(max_births, max_deaths)
-plt.plot([0, max_diag], [0, max_diag], color='k', label = 'Diagonal')
+flat_dgms_all1 = [[item for sublist in dgm for item in sublist] for dgm in dgms_all1]
+flat_dgms_all2 = [[item for sublist in dgm for item in sublist] for dgm in dgms_all2]
+max_births1, max_deaths1 = max([max([ i[1][0] for i in flat_dgm]) for flat_dgm in flat_dgms_all1]), max([max([ i[1][1] for i in flat_dgm]) for flat_dgm in flat_dgms_all1])
+max_diag1 = max(max_births1, max_deaths1)
+plt.plot([0, max_diag1], [0, max_diag1], color='k', label = 'Diagonal')
 diag0s = [] 
 diag1s = []
 diag2s = []
-for i,dgm in enumerate(dgms_all):
-    print(i)
-    flat_dgm = [item for sublist in dgm for item in sublist]
-    diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
-    #diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
-    #diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
-    diag0s += np.hstack((diag0, i*height*np.ones([len(diag0),1]))).tolist()
-    #diag1s += np.hstack((diag1, i*height*np.ones([len(diag1),1]))).tolist()
-    #diag2s += np.hstack((diag2, i*height*np.ones([len(diag2),1]))).tolist()
-    plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
-    #plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
-    #plt.scatter(diag2.T[0], diag2.T[1], color=col2s[i])
+for j,dgms_all in enumerate([dgms_all1, dgms_all2]):
+    print(j)
+    for i,dgm in enumerate(dgms_all):
+        print(i)
+        flat_dgm = [item for sublist in dgm for item in sublist]
+        diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
+        #diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
+        #diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
+        diag0s += np.hstack((diag0, i*height*np.ones([len(diag0),1]))).tolist()
+        #diag1s += np.hstack((diag1, i*height*np.ones([len(diag1),1]))).tolist()
+        #diag2s += np.hstack((diag2, i*height*np.ones([len(diag2),1]))).tolist()
+        plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
+        #plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
+        #plt.scatter(diag2.T[0], diag2.T[1], color=col2s[i])
 plt.axis('equal')
 plt.grid(True)
 plt.show()
@@ -299,7 +304,7 @@ visited = {}
 alpha_cmplx = []
 diagXs = diagss[deg]
 dela = Delaunay(diagXs)
-write_obj("./objs/blah.obj", diagXs, [], 'test')
+write_obj("./objs/blah1.obj", diagXs, [], 'test')
 for i, tetra in enumerate(dela.simplices):
     if int(i*100/len(dela.simplices))%5 == 0:
         if suppress == 0:
