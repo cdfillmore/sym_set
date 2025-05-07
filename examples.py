@@ -185,7 +185,7 @@ pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
 ############   Create 3d 0th + 1st medial axes + evolute obj
-name = "cup4"
+name = "cup3"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 

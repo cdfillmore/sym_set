@@ -4,3 +4,4 @@ scipy
 gudhi
 libigl
 shapely
+icosphere
