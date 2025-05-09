@@ -62,18 +62,26 @@ pts_circ += np.array([1.1, 1.5])
 
 ############    make line bundle surface from curve
 
+obj = read_obj_curve("./objs/test-curve1.obj")
+n = len(obj)
+t_values = np.linspace(0, 2*np.pi,n)
+name_x = lambda t: curve.T[0][np.where(t_values == t)]
+name_y = lambda t: curve.T[2][np.where(t_values == t)]
+
+
 #circ_x = lambda t: 1.2*np.cos(t)
 #circ_y = lambda t: 1*np.sin(t)
 #obj = plot_parametric_2d(circ_x, circ_y, [0, 2*np.pi], num_points=n, title="2D Parametric Plot")[:-1]
-egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
-egg_y = lambda t: 4*np.sin(t)
-bumpy_x = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.cos(np.pi*t)
-bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
-name_x, name_y = egg_x, egg_y
-n = 1000
+
+#egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
+#egg_y = lambda t: 4*np.sin(t)
+#bumpy_x = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.cos(np.pi*t)
+#bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
+#name_x, name_y = egg_x, egg_y
+#n = 1000
 l=100
 obj = plot_parametric_2d(name_x, name_y, [0, 2*np.pi], num_points=n, title="2D Parametric Plot")[:-1]
-normals, curvature = compute_normals_and_curvature(name_x, name_y, np.linspace(0, 2*np.pi,n))
+normals, curvature = compute_normals_and_curvature(name_x, name_y, t_values)
 e = evolute(obj, np.inf, False)
 pts1, pts2, faces1, faces2 = [], [], [], []
 for i, (pt, norm, curv) in enumerate(zip(obj, normals, curvature)):
