@@ -11,7 +11,8 @@ lambda_val = .4
 n = 1000
 frames = 150
 
-egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
+#egg_x = lambda t: ((36 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
+egg_x = lambda t: ((23 - np.sin(t)*np.sin(t))**(1 / 2) + np.cos(t))*np.cos(t)
 egg_y = lambda t: 4*np.sin(t)
 pts_egg = plot_parametric_2d(egg_x, egg_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
 pts_egg += np.array([0,6])
@@ -22,13 +23,13 @@ pts_egg += np.array([0,6])
 '''
 potato_x = lambda t: 2*np.cos(t)
 potato_y = lambda t: (3/2)*np.cos(t/2)*np.cos(t/2)*np.sin(t)
-pts_potato = plot_parametric_2d(potato_x, potato_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
+#pts_potato = plot_parametric_2d(potato_x, potato_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
 pts_potato += np.array([0,6])
 
 
 ellipse_x = lambda t: 6*np.cos(t)
 ellipse_y = lambda t: 4*np.sin(t)
-pts_ellipse = plot_parametric_2d(ellipse_x, ellipse_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
+#pts_ellipse = plot_parametric_2d(ellipse_x, ellipse_y, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
 pts_ellipse -= np.array([0,6])
 
 pts = np.array(pts_egg.tolist() + pts_ellipse.tolist())
@@ -36,16 +37,16 @@ pts = np.array(pts_egg.tolist() + pts_ellipse.tolist())
 
 bumpy_x = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.cos(np.pi*t)
 bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
-pts_bumpy = plot_parametric_2d(bumpy_x, bumpy_y, [0, 2], num_points=n, title="2D Parametric Plot")[:-1]
+#pts_bumpy = plot_parametric_2d(bumpy_x, bumpy_y, [0, 2], num_points=n, title="2D Parametric Plot")[:-1]
 
 
-plot_medial_evolute(pts_bumpy, lambda_val, [0.1, 0.1], None)
+#plot_medial_evolute(pts_bumpy, lambda_val, [0.1, 0.1], None)
 plot_medial_evolute(pts_egg, lambda_val, [0.1, 0.1], None)
 
-'''
+#'''
 # old animations
 # make animation
-for i,x in enumerate(np.linspace(8, 4, frames)):
+for i,x in enumerate(np.linspace(-.5, .5, frames)):
     print(i)
     dgms = plot_medial_evolute(pts_egg, lambda_val, [3, x], './anim/frame_{}.png'.format(str(i).zfill(4)))
 for i,x in enumerate(np.linspace(-1, 3, frames)):
@@ -58,7 +59,29 @@ circ_x = lambda t: np.cos(t)
 circ_y = lambda t: np.sin(t)
 pts_circ = plot_parametric_2d(circ_x, circ_y, [-np.pi, np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 pts_circ += np.array([1.1, 1.5])
-'''
+#'''
+
+############   Animate sym set for evolving curves
+
+lambda_val = .4
+n = 1000
+frames = 180
+
+a = 1.5
+b = 1
+q = 20
+T = np.linspace(-np.pi, np.pi, n+1)[:-1]
+ptsX = [a*np.sin(t) for t in T]
+ptsY = [b*(np.cos(t) - 1) for t in T]
+for i, h in enumerate(np.linspace(0,0.15642458100558657,frames)):
+    print(i)
+    #pts = plot_parametric_2d(ptsX, ptsY, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
+    H = [np.exp(-q*t*t)*h for t in T]
+    pts = np.array([ptsX, ptsY]).T - np.array([np.zeros(n), H]).T
+    plot_medial_evolute(pts, lambda_val, [0.1, 0.1], f"./evolving_anim/frame_{str(i).zfill(4)}.png")
+
+
+
 
 ############    make line bundle surface from curve
 
@@ -193,12 +216,12 @@ pts = np.array([np.ravel(x), np.ravel(y), np.ravel(z)]).T
 write_obj('objs/new_ellipsoid.obj', pts, [], 'new_ellipsoid')
 
 ############   Create 3d 0th + 1st medial axes + evolute obj
-name = "cup3"
+name = "ellipsoid_dent"
 file = "../sym_set/objs/{}.obj".format(name)
 out_file = "../sym_set/objs/{}".format(name)
 
-input = read_obj(file)
-focal1, focal2 = evolute_3d(*input,radius=2)
+inputs = read_obj(file)
+focal1, focal2 = evolute_3d(*inputs,radius=2)
 write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".format(name))
 write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
 

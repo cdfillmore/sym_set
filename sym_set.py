@@ -234,7 +234,7 @@ def create_mesh_from_arrays(x, y, z):
     return vertices, np.array(faces)
 
 def evolute_3d(pts, simps, normals=None, radius=5):
-    d1, d2, k1, k2 = igl.principal_curvature(pts, simps, radius=radius)
+    d1, d2, k1, k2, extra = igl.principal_curvature(pts, simps, radius=radius)
     if type(normals) == type(None):
         normals = igl.per_vertex_normals(pts, simps)
     focal1 = []
