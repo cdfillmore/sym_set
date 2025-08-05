@@ -222,11 +222,11 @@ out_file = "../sym_set/objs/{}".format(name)
 
 inputs = read_obj(file)
 focal1, focal2 = evolute_3d(*inputs,radius=2)
-write_obj("{}_focal1.obj".format(out_file), focal1, input[1], name="{}_focal_1".format(name))
-write_obj("{}_focal2.obj".format(out_file), focal2, input[1], name="{}_focal_2".format(name))
+write_obj("{}_focal1.obj".format(out_file), focal1, inputs[1], name="{}_focal_1".format(name))
+write_obj("{}_focal2.obj".format(out_file), focal2, inputs[1], name="{}_focal_2".format(name))
 
 alpha = 1
-Lambda = .09
+Lambda = .35
 n = 10000
 sample = gen_sample_from_obj(file, n)
 #sample = read_obj(file)[0]   # for curves/knots/links
