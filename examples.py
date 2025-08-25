@@ -270,12 +270,13 @@ write_obj("./objs/{}_focal1.obj".format(name), focal1, obj[1], name="{}_focal_1"
 write_obj("./objs/{}_focal2.obj".format(name), focal2, obj[1], name="{}_focal_2".format(name))
 
 
+
 ############   3d example
-name = "twist_4"
+name = "torus_other"
 #pts, simps = read_obj("objs/{}.obj".format(name))
-pts = read_obj_curve(f"objs/{name}.obj")[:-1]
-simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
-obsv_curve = read_obj_curve("objs/obsv_loop.obj")
+pts1, simps1 = read_obj(f"objs/{name}.obj")
+#simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts))])
+obsv_curve = read_obj_curve("objs/torus-obsv.obj")
 lambda_val = .4
 alpha = 5e-2
 height = 0.016891891891891893
@@ -289,73 +290,76 @@ dgms_all1 = []
 dgms_all2 = []
 for i,y in enumerate(obsv_curve):
     print(i)
+    #print(f"i: {i}, y: {y}")
     #x = np.array([y[0], y[1], 0])
-    dgms_all1 += [plot_extended_persistence3d(pts1, simps1, y, None, 'b', 'r', 'g')]
-    dgms_all2 += [plot_extended_persistence3d(pts2, simps2, y, None, 'b', 'r', 'g')]
+    dgms_all1 += [plot_regular_persistence3d(pts1, simps1, y, None, 'b', 'r', 'g')]
+    #dgms_all2 += [plot_extended_persistence3d(pts2, simps2, y, None, 'b', 'r', 'g')]
 #os.system("ffmpeg -framerate 30 -pattern_type glob -i './anim4/*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence_worm.mp4")
 
 col0s = [colorsys.hsv_to_rgb(0.,1,j) for j in np.linspace(0.5,0.9,frames)]
 col1s = [colorsys.hsv_to_rgb(1/3,1,j) for j in np.linspace(0.5,0.9,frames)]
 col2s = [colorsys.hsv_to_rgb(2/3,1,j) for j in np.linspace(0.5,0.9,frames)]
 flat_dgms_all1 = [[item for sublist in dgm for item in sublist] for dgm in dgms_all1]
-flat_dgms_all2 = [[item for sublist in dgm for item in sublist] for dgm in dgms_all2]
+#flat_dgms_all2 = [[item for sublist in dgm for item in sublist] for dgm in dgms_all2]
 max_births1, max_deaths1 = max([max([ i[1][0] for i in flat_dgm]) for flat_dgm in flat_dgms_all1]), max([max([ i[1][1] for i in flat_dgm]) for flat_dgm in flat_dgms_all1])
 max_diag1 = max(max_births1, max_deaths1)
-plt.plot([0, max_diag1], [0, max_diag1], color='k', label = 'Diagonal')
+#plt.plot([0, max_diag1], [0, max_diag1], color='k', label = 'Diagonal')
 diag0s = [] 
 diag1s = []
 diag2s = []
-for j,dgms_all in enumerate([dgms_all1, dgms_all2]):
+for j,dgms_all in enumerate([dgms_all1]):#, dgms_all2]):
     print(j)
     for i,dgm in enumerate(dgms_all):
         print(i)
         flat_dgm = [item for sublist in dgm for item in sublist]
         diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
-        #diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
-        #diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
+        diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
+        diag2 = np.array([ i[1] for i in flat_dgm if i[0]==2])
         diag0s += np.hstack((diag0, i*height*np.ones([len(diag0),1]))).tolist()
         #diag1s += np.hstack((diag1, i*height*np.ones([len(diag1),1]))).tolist()
         #diag2s += np.hstack((diag2, i*height*np.ones([len(diag2),1]))).tolist()
-        plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
+        #plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
         #plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
         #plt.scatter(diag2.T[0], diag2.T[1], color=col2s[i])
-plt.axis('equal')
-plt.grid(True)
-plt.show()
+#plt.axis('equal')
+#plt.grid(True)
+#plt.show()
 
 diag0s = np.array(diag0s)
-diag1s = np.array(diag1s)
-diag2s = np.array(diag2s)
+#diag1s = np.array(diag1s)
+#diag2s = np.array(diag2s)
 
-diagss = [diag0s]#, diag1s, diag2s]
+diag0s[diag0s == np.inf] = .5e1
 
-deg = 0
-suppress = 0
-visited = {}
-alpha_cmplx = []
-diagXs = diagss[deg]
-dela = Delaunay(diagXs)
-write_obj("./objs/blah1.obj", diagXs, [], 'test')
-for i, tetra in enumerate(dela.simplices):
-    if int(i*100/len(dela.simplices))%5 == 0:
-        if suppress == 0:
-            print("{}%: ".format(int(i*100/len(dela.simplices))), tetra)
-            suppress = 1
-    else:
-        suppress = 0
-    edges = it.combinations(tetra,2)
-    for edge in edges:
-        if tuple(sorted(list(edge))) in visited:
-            continue
+diagss = [diag0s]#, diag1s]#, diag2s]
+
+for deg in range(len(diagss)):
+    suppress = 0
+    visited = {}
+    alpha_cmplx = []
+    diagXs = diagss[deg]
+    dela = Delaunay(diagXs)
+    write_obj("./objs/blah1.obj", diagXs, [], 'test')
+    for i, tetra in enumerate(dela.simplices):
+        if int(i*100/len(dela.simplices))%5 == 0:
+            if suppress == 0:
+                print("{}%: ".format(int(i*100/len(dela.simplices))), tetra)
+                suppress = 1
         else:
-            verts = np.array(diagXs)[list(edge)]
-            if distance(verts) < alpha and np.abs(diagXs[edge[0]][2] - diagXs[edge[1]][2]) > 1e-6 and np.abs(diagXs[edge[0]][2] - diagXs[edge[1]][2]) < height+1e-6:
-                alpha_cmplx.append(tuple(sorted(list(edge))))
-                visited[tuple(sorted(list(edge)))]=1
-alpha_cmplx = np.array(alpha_cmplx)
+            suppress = 0
+        edges = it.combinations(tetra,2)
+        for edge in edges:
+            if tuple(sorted(list(edge))) in visited:
+                continue
+            else:
+                verts = np.array(diagXs)[list(edge)]
+                if distance(verts) < alpha and np.abs(diagXs[edge[0]][2] - diagXs[edge[1]][2]) > 1e-6 and np.abs(diagXs[edge[0]][2] - diagXs[edge[1]][2]) < height+1e-6:
+                    alpha_cmplx.append(tuple(sorted(list(edge))))
+                    visited[tuple(sorted(list(edge)))]=1
+    alpha_cmplx = np.array(alpha_cmplx)
 
 
-write_obj('./objs/{}_vines_{}.obj'.format(name, deg), diagXs, alpha_cmplx, "{}_vines_{}".format(name, deg))
+    write_obj('./objs/{}_vines_{}.obj'.format(name, deg), diagXs, alpha_cmplx, "{}_vines_{}".format(name, deg))
 
 
 

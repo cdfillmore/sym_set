@@ -556,6 +556,58 @@ def plot_medial_evolute(pts, lambda_value, pt, outfile=None, col0='b', col1='r',
 
     return dgms
 
+# build regular Persistence diagram
+def plot_regular_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r', col2='g'):
+    if len(simps) > 0:
+        d = max([len(i) for i in simps])-1
+    else:
+        d = 0
+    cplx = gudhi.SimplexTree()
+    cplx.set_dimension(d)
+    for i, v in enumerate(pts):
+        cplx.insert([i], filtration=np.linalg.norm(v - np.array(pt)))
+    for simp in simps:
+        cplx.insert(simp, filtration=max([cplx.filtration([i]) for i in simp]))
+    #cplx.make_filtration_non_decreasing()
+    #cplx.extend_filtration()
+    cplx.compute_persistence()#persistence_dim_max=2)
+    pairs = cplx.persistence_pairs()
+    flat_dgms = [[len(pair[0])-1, [cplx.filtration(pair[0]), cplx.filtration(pair[1])]] for pair in pairs]
+    
+    diag0 = np.array([ i[1] for i in flat_dgms if i[0]==0])
+    diag1 = np.array([ i[1] for i in flat_dgms if i[0]==1])
+    diag2 = np.array([ i[1] for i in flat_dgms if i[0]==2])
+    diags = [diag0, diag1, diag2]
+    dgms = [ [ [j, k] for k in diags[j]] for j in range(d+1)]
+
+
+    max_births, max_deaths = max([ i[1][0] for i in flat_dgms]), max([ i[1][1] for i in flat_dgms])
+    max_diag = max(max_births, max_deaths)
+
+    #gudhi.plot_persistence_diagram(cplx.persistence(), axes=ax2)
+    plt.plot([0, max_diag], [0, max_diag], color='k', label = 'Diagonal')
+    plt.scatter(diag0.T[0], diag0.T[1], color=col0, label='0th Diagram')
+    if d>1:
+        plt.scatter(diag1.T[0], diag1.T[1], color=col1, label='1st Diagram')
+    if d>2:
+        plt.scatter(diag2.T[0], diag2.T[1], color=col2, label='2nd Diagram')
+    plt.legend(loc='lower right')
+    #plt.set_title('Persistence Diagram')
+    #plt.set_xlabel('Birth')
+    #plt.set_ylabel('Death')
+    plt.axis('equal')
+    plt.grid(True)
+    plt.legend()
+    #ax2.set_xlim([-0.1, 15])
+    #ax2.set_ylim([-0.1, 15])
+    if outfile==None:
+        plt.close()  # Close the figure to free up memory
+    else:
+        plt.show()
+    return dgms
+
+
+
 # build extended Persistence diagram
 def plot_extended_persistence3d(pts, simps, pt, outfile=None, col0='b', col1='r', col2='g'):
     if len(simps) > 0:
