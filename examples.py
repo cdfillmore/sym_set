@@ -41,17 +41,17 @@ bumpy_y = lambda t: (1.5 + .5*np.sin(6*np.pi*t))*np.sin(np.pi*t)
 
 
 #plot_medial_evolute(pts_bumpy, lambda_val, [0.1, 0.1], None)
-plot_medial_evolute(pts_egg, lambda_val, [0.1, 0.1], None)
+plot_medial_evolute(pts_egg, lambda_val, [0.1, 0.1], True, None, True, 1e10)
 
 #'''
 # old animations
 # make animation
 for i,x in enumerate(np.linspace(-.5, .5, frames)):
     print(i)
-    dgms = plot_medial_evolute(pts_egg, lambda_val, [3, x], './anim/frame_{}.png'.format(str(i).zfill(4)))
+    dgms = plot_medial_evolute(pts_egg, lambda_val, [3, x], True, './anim/frame_{}.png'.format(str(i).zfill(4)), True, 1e10)
 for i,x in enumerate(np.linspace(-1, 3, frames)):
     print(frames + i)
-    dgms = plot_medial_evolute(pts_egg, lambda_val, [x, 8], './anim/frame_{}.png'.format(str(frames + i).zfill(4)))
+    dgms = plot_medial_evolute(pts_egg, lambda_val, [x, 8], True, './anim/frame_{}.png'.format(str(frames + i).zfill(4)), True, 1e10)
 os.sys("ffmpeg -framerate 30 -pattern_type glob -i '*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence.mp4")
 
 
@@ -78,7 +78,7 @@ for i, h in enumerate(np.linspace(0,0.15642458100558657,frames)):
     #pts = plot_parametric_2d(ptsX, ptsY, [-np.pi, np.pi], num_points=n, title="2D Parametric Plot")[:-1]
     H = [np.exp(-q*t*t)*h for t in T]
     pts = np.array([ptsX, ptsY]).T - np.array([np.zeros(n), H]).T
-    plot_medial_evolute(pts, lambda_val, [0.1, 0.1], f"./evolving_anim/frame_{str(i).zfill(4)}.png")
+    plot_medial_evolute(pts, lambda_val, [0.1, 0.1], True, f"./evolving_anim/frame_{str(i).zfill(4)}.png",True, 1e10)
 
 
 
@@ -142,14 +142,15 @@ circle = plot_parametric_2d(circ_x, circ_y, [0, 4*np.pi], num_points=frames, tit
 dgms_all = []
 for i,x in enumerate(circle):
     print(i)
-    dgms_all += [plot_medial_evolute(wormier, 0.1, x, './anim4/frame_{}.png'.format(str(i).zfill(4)), 'b', 'r')]
+    dgms_all += [plot_medial_evolute(pts, 0.1, x, True, './anim5/frame_{}.png'.format(str(i).zfill(4)), True, 1e10, 'b', 'r')]
 #os.system("ffmpeg -framerate 30 -pattern_type glob -i './anim4/*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence_worm.mp4")
 
 
 
 col0s = [colorsys.hsv_to_rgb(0.25,1,j) for j in np.linspace(0.5,0.9,frames)]
 col1s = [colorsys.hsv_to_rgb(0.75,1,j) for j in np.linspace(0.5,0.9,frames)]
-flat_dgms_all = [[item for sublist in dgm for item in sublist] for dgm in dgms_all]
+#flat_dgms_all = [[item for sublist in dgm for item in sublist] for dgm in dgms_all]
+flat_dgms_all = dgms_all
 max_births, max_deaths = max([max([ i[1][0] for i in flat_dgm]) for flat_dgm in flat_dgms_all]), max([max([ i[1][1] for i in flat_dgm]) for flat_dgm in flat_dgms_all])
 max_diag = max(max_births, max_deaths)
 plt.plot([0, max_diag], [0, max_diag], color='k', label = 'Diagonal')
@@ -157,7 +158,8 @@ diag0s = []
 diag1s = []
 for i,dgm in enumerate(dgms_all):
     print(i)
-    flat_dgm = [item for sublist in dgm for item in sublist]
+    #flat_dgm = [item for sublist in dgm for item in sublist]
+    flat_dgm = dgm
     diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
     diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
     diag0s += np.hstack((diag0, i*1e-1*np.ones([len(diag0),1]))).tolist()
@@ -171,25 +173,24 @@ plt.show()
 diag0s = np.array(diag0s)
 diag1s = np.array(diag1s)
 
-visited = {}
-alpha=.15
-alpha_cmplx = []
-dela = Delaunay(diag0s)
-for tetra in dela.simplices:
-    edges = it.combinations(tetra,2)
-    for edge in edges:
-        if tuple(sorted(list(edge))) in visited:
-            continue
-        else:
-            verts = np.array(diag0s)[list(edge)]
-            if distance(verts) < alpha:
-                alpha_cmplx.append(tuple(sorted(list(edge))))
-                visited[tuple(sorted(list(edge)))]=1
-alpha_cmplx = np.array(alpha_cmplx)
+for i,diag in enumerate([diag0s, diag1s]):
+    dela = Delaunay(diag1s)
+    visited = {}
+    alpha=.15
+    alpha_cmplx = []
+    for tetra in dela.simplices:
+        edges = it.combinations(tetra,2)
+        for edge in edges:
+            if tuple(sorted(list(edge))) in visited:
+                continue
+            else:
+                verts = np.array(diag0s)[list(edge)]
+                if distance(verts) < alpha:
+                    alpha_cmplx.append(tuple(sorted(list(edge))))
+                    visited[tuple(sorted(list(edge)))]=1
+    alpha_cmplx = np.array(alpha_cmplx)
 
-
-write_obj('./objs/vineyard0.obj', diag0s, alpha_cmplx)
-write_obj('./objs/vineyard1.obj', diag1s, [])
+    write_obj(f'./objs/vineyard{i}.obj', diag, alpha_cmplx)
 
 
 ############   Create 3d egg
@@ -362,10 +363,35 @@ for deg in range(len(diagss)):
     write_obj('./objs/{}_vines_{}.obj'.format(name, deg), diagXs, alpha_cmplx, "{}_vines_{}".format(name, deg))
 
 
+################################################################
+# make offset of curve in the plane
+offset = 0.8
+n=2000
+
+pts = np.array([[(t*t/(4*np.pi) + .5)*np.cos(t), (t*t/(4*np.pi)+.5)*np.sin(t)] for t in np.linspace(0,(18*np.pi)/4,n+1)][:-1])
+simps = np.array([[i,(i+1)%len(pts)] for i in range(len(pts)-1)])
+
+dpts = np.array([ pts[i+1] - pts[i] for i in range(len(pts)-1)])
+dpts = np.divide(dpts,np.linalg.norm(dpts,axis=1)[:,np.newaxis])
+
+rot = np.array([[0,-1],[1,0]])
+norms = np.dot(rot, dpts.T).T
+norms = offset*np.divide(norms,np.linalg.norm(norms,axis=1)[:,np.newaxis])
+
+pos_offset = pts[:-1] + norms
+neg_offset = pts[:-1] - norms
 
 
+write_obj("./objs/spiral_test.obj", np.hstack([pts, np.zeros([len(pts),1])]), simps)
+write_obj("./objs/pos_offset.obj", np.hstack([pos_offset, np.zeros([len(pos_offset),1])]), simps)
+write_obj("./objs/neg_offset.obj", np.hstack([neg_offset, np.zeros([len(neg_offset),1])]), simps)
 
+# Do blender stuff to add 
 
+pts = read_obj_curve('./objs/arc_len_curve.obj')
+pts = pts[:,[0,2]]
+pts += 1e-12*np.random.randn(len(pts),1)
+plot_medial_evolute(pts, 1, [0.1, 0.1], True, None, False)
 
 ################################################################
 # make alpha complex
