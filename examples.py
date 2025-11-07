@@ -129,20 +129,23 @@ write_obj("./objs/medial_1_faces.obj", pts2, faces2, "medial_1_faces")
 ############   2d example
 lambda_val = .4
 n = 1000
-frames = 150
+frames = 100
+h = 5e-2
+alpha = 0.1
+reach = 0.1
 #circ_x = lambda t: (0.1+.05*t/(4*np.pi))*np.cos(t)
 #circ_y = lambda t: (0.1+.05*t/(4*np.pi))*np.sin(t)
 #spiral = plot_parametric_2d(circ_x, circ_y, [0, 4*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 #spiral += np.array([-0.174193, 0.162457])
-circ_x = lambda t: 1*np.cos(t)
-circ_y = lambda t: 1*np.sin(t)
-circle = plot_parametric_2d(circ_x, circ_y, [0, 4*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
+circ_x = lambda t: 0.05*np.cos(t)
+circ_y = lambda t: 0.05*np.sin(t)
+circle = plot_parametric_2d(circ_x, circ_y, [0, 2*np.pi], num_points=frames, title="2D Parametric Plot")[:-1]
 #circle += np.array([-0.174193, 0.162457])
 # make animation
 dgms_all = []
 for i,x in enumerate(circle):
     print(i)
-    dgms_all += [plot_medial_evolute(pts, 0.1, x, True, './anim5/frame_{}.png'.format(str(i).zfill(4)), True, 1e10, 'b', 'r')]
+    dgms_all += [plot_medial_evolute(pts, reach, x, True, './anim6/frame_{}.png'.format(str(i).zfill(4)), True, 1e10, 'b', 'r')]
 #os.system("ffmpeg -framerate 30 -pattern_type glob -i './anim4/*.png' -c:v libx264 -pix_fmt yuv420p extended_persistence_worm.mp4")
 
 
@@ -160,10 +163,10 @@ for i,dgm in enumerate(dgms_all):
     print(i)
     #flat_dgm = [item for sublist in dgm for item in sublist]
     flat_dgm = dgm
-    diag0 = np.array([ i[1] for i in flat_dgm if i[0]==0])
-    diag1 = np.array([ i[1] for i in flat_dgm if i[0]==1])
-    diag0s += np.hstack((diag0, i*1e-1*np.ones([len(diag0),1]))).tolist()
-    diag1s += np.hstack((diag1, i*1e-1*np.ones([len(diag1),1]))).tolist()
+    diag0 = np.array([ np.array(i[1])/1 for i in flat_dgm if i[0]==0])  # just divide by 10 because the scale is so big for the big spiral
+    diag1 = np.array([ np.array(i[1])/1 for i in flat_dgm if i[0]==1])
+    diag0s += np.hstack((diag0, i*h*np.ones([len(diag0),1]))).tolist()
+    diag1s += np.hstack((diag1, i*h*np.ones([len(diag1),1]))).tolist()
     plt.scatter(diag0.T[0], diag0.T[1], color=col0s[i])
     plt.scatter(diag1.T[0], diag1.T[1], color=col1s[i])
 plt.axis('equal')
@@ -176,7 +179,6 @@ diag1s = np.array(diag1s)
 for i,diag in enumerate([diag0s, diag1s]):
     dela = Delaunay(diag1s)
     visited = {}
-    alpha=.15
     alpha_cmplx = []
     for tetra in dela.simplices:
         edges = it.combinations(tetra,2)
@@ -190,7 +192,8 @@ for i,diag in enumerate([diag0s, diag1s]):
                     visited[tuple(sorted(list(edge)))]=1
     alpha_cmplx = np.array(alpha_cmplx)
 
-    write_obj(f'./objs/vineyard{i}.obj', diag, alpha_cmplx)
+    write_obj(f'./objs/vineyard{i}.obj', diag, alpha_cmplx, f'vineyard{i}')
+    #write_obj(f'./objs/vineyard{i}.obj', diag, [], f'vineyard{i}')
 
 
 ############   Create 3d egg
