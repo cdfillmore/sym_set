@@ -7,8 +7,6 @@ Arc-length parameterized logarithmic spiral:
 
 Arc length formula gives closed-form θ(s), so we can compute
 (x(s), y(s)) directly.
-
-Author: ChatGPT
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -75,8 +73,6 @@ arc_length_param.py
 
 Given a curve as an array of (x,y) points, return an arc-length
 parameterized version (uniform sampling in arc length).
-
-Author: ChatGPT
 """
 import numpy as np
 
