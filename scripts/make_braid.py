@@ -19,10 +19,12 @@ Conventions:
     The braid travels with increasing theta around the positive z axis.
     Lanes are numbered 1..STRAND_COUNT, from inner to outer.
 
-The antipodal perturbations here move the OVER strand radially outward
-and the UNDER strand inward at theta_crossing + pi. This matches the
-qualitative 'push/pull' mechanism in the paper; it is not a complete
-implementation of the proof's elder-rule surgery and inequalities (7),(8).
+The antipodal perturbations assign a radial target to EVERY back strand
+at each crossing. For same-component crossings away from the earliest birth,
+the ordering follows the three-tier inequalities (7) of Section 4.2.
+Crossings involving the earliest birth use a separate, explicit heuristic
+because the paper uses elder-rule surgery there. This script does NOT
+compute persistent homology or certify vineyard isotopy.
 """
 
 import math
@@ -49,8 +51,11 @@ BRAID_WORD = [1, -2, 1, -2, 1, -2, 3]
 
 CORE_RADIUS = 20
 LANE_SPACING = 1.0
-CROSSING_HEIGHT = 0.5  # Each front participant rises/falls this far.
-BACK_RADIAL_PUSH = 1.0  # Each paired back participant moves +/- this far.
+CROSSING_HEIGHT = 0.1  # Each front participant rises/falls this far.
+BACK_RADIAL_PUSH = 5.0  # Each paired back participant moves +/- this far.
+BACK_ORDERING_GAP = 0.36  # Difference between middle and high/low death tiers.
+BACK_BASELINE_STAGGER = 0.1  # Break near-equal death values between crossings.
+BACK_BUMP_WIDTH_FACTOR = 1.30  # Wider antipodal bumps, without overlap.
 
 # Four angular regions, with angle zero pointing along +x:
 # front:      [-30, +30] degrees (pi/3 wide)
@@ -97,6 +102,7 @@ OBSERVATION_ENVELOPE_SHARPNESS = 45.0  # Legacy setting, no longer used.
 SAVE_BLEND_PATH = ""  # Optional: e.g. "//braiding_vineyards.blend"
 
 
+
 # =====================================================================
 # PARAMETRIC CONSTRUCTION
 # =====================================================================
@@ -139,7 +145,7 @@ class FrontEvent:
 class BackEvent:
     a: float
     b: float
-    radial_sign: int   # +1 = outward, -1 = inward
+    radial_offset: float  # Target radial offset at this event's center.
 
 
 @dataclass
@@ -152,6 +158,7 @@ class BraidPlan:
     back: list          # back[strand_id] -> list[BackEvent]
     back_ends: list
     crossings: list     # (theta_center, inner_id, outer_id, sign, halfwidth)
+    ordering_info: list # Diagnostics for antipodal death constraints
 
 
 def check_settings():
@@ -163,14 +170,16 @@ def check_settings():
                 "Each braid generator must be a nonzero integer in "
                 "[-(STRAND_COUNT-1), +(STRAND_COUNT-1)]"
             )
-    if CORE_RADIUS <= (STRAND_COUNT - 1) * LANE_SPACING * 0.5 + BACK_RADIAL_PUSH:
+    if CORE_RADIUS <= (STRAND_COUNT - 1) * LANE_SPACING * 0.5 + BACK_RADIAL_PUSH + BACK_ORDERING_GAP:
         raise ValueError("CORE_RADIUS is too small for the radial strand levels")
-    if LANE_SPACING <= 0 or CROSSING_HEIGHT <= 0 or BACK_RADIAL_PUSH <= 0:
+    if LANE_SPACING <= 0 or CROSSING_HEIGHT <= 0 or BACK_RADIAL_PUSH <= 0 or BACK_ORDERING_GAP <= 0:
         raise ValueError("Spacing and both displacements must be positive")
     if not (5.0 < FRONT_HALF_ANGLE_DEG < 85.0):
         raise ValueError("FRONT_HALF_ANGLE_DEG must be between 5 and 85")
     if not (0.0 < TWIST_RAMP_FRACTION <= 1.0):
         raise ValueError("TWIST_RAMP_FRACTION must be in (0,1]")
+    if not (0.0 < BACK_BUMP_WIDTH_FACTOR * CROSSING_SLOT_FRACTION < 1.0):
+        raise ValueError("Back bump width must remain below one crossing slot")
     if not (0.0 < CROSSING_SLOT_FRACTION < 1.0):
         raise ValueError("CROSSING_SLOT_FRACTION must be in (0,1)")
     if SAMPLES_PER_TURN < 64 or SAMPLES_PER_CROSSING < 8:
@@ -191,7 +200,16 @@ def check_settings():
 
 
 def compile_braid(n, word):
-    """Track braid strand identity as crossings exchange radial slots."""
+    """Track braid permutation and prescribe every antipodal death level.
+
+    At a crossing between births j<k on the SAME component, assume death
+    D_i corresponds to the arc immediately after the i-th birth when walking
+    along that component. The crossing pair in the vineyard then comprises
+    D_(j-1) and D_k, with other deaths partitioned as inequality (7).
+
+    The pairing assumption is a combinatorial design choice, NOT a persistence
+    computation. The elder birth (j=0) is handled separately.
+    """
     front = [[] for _ in range(n)]
     back = [[] for _ in range(n)]
     lane_to_strand = list(range(n))
@@ -199,41 +217,91 @@ def compile_braid(n, word):
 
     angular_slot = (FRONT_END - FRONT_BEGIN) / (len(word) + 1)
     halfwidth = 0.5 * CROSSING_SLOT_FRACTION * angular_slot
-
-    for j, g in enumerate(word):
+    for event_index, g in enumerate(word):
         lane = abs(g) - 1
         sign = 1 if g > 0 else -1
         inner_id = lane_to_strand[lane]
         outer_id = lane_to_strand[lane + 1]
-        center = FRONT_BEGIN + (j + 1) * angular_slot
-        a = center - halfwidth
-        b = center + halfwidth
-
-        # Radial positions swap; only these two strands leave the xy plane.
+        center = FRONT_BEGIN + (event_index + 1) * angular_slot
+        a, b = center - halfwidth, center + halfwidth
         front[inner_id].append(FrontEvent(a, b, lane, lane + 1, sign))
         front[outer_id].append(FrontEvent(a, b, lane + 1, lane, -sign))
-
-        # The antipodal pair acts on THESE SAME physical strands, although
-        # their final back z-levels depend on the whole braid permutation.
-        back[inner_id].append(BackEvent(a + PI, b + PI, sign))
-        back[outer_id].append(BackEvent(a + PI, b + PI, -sign))
         crossings.append((center, inner_id, outer_id, sign, halfwidth))
-
         lane_to_strand[lane], lane_to_strand[lane + 1] = (
-            lane_to_strand[lane + 1], lane_to_strand[lane]
-        )
+            lane_to_strand[lane + 1], lane_to_strand[lane])
 
-    # The strand starting at slot i ends at slot permutation[i].
     permutation = [None] * n
     for ending_lane, start_id in enumerate(lane_to_strand):
         permutation[start_id] = ending_lane
+    components = link_cycles(permutation)
+    component_index = {sid: c for c, cyc in enumerate(components) for sid in cyc}
+    ordering_info = []
 
-    return BraidPlan(
-        n=n, word=list(word), permutation=permutation, front=front,
-        front_ends=[[e.b for e in es] for es in front],
-        back=back, back_ends=[[e.b for e in es] for es in back],
-        crossings=crossings,
-    )
+    for center, inner_id, outer_id, sign, width in crossings:
+        offsets = {sid: BACK_BASELINE_STAGGER * (sid - 0.5*(n-1))
+                   for sid in range(n)}
+        over_id = inner_id if sign > 0 else outer_id
+        under_id = outer_id if sign > 0 else inner_id
+        ci, co = component_index[inner_id], component_index[outer_id]
+        info = {'angle': center, 'front_over': over_id, 'front_under': under_id}
+        if ci != co:
+            # Different components: all their death values are ordered, as
+            # described in the easier case on page 29 of the paper.
+            for sid in components[ci]:
+                offsets[sid] = (BACK_RADIAL_PUSH + BACK_ORDERING_GAP) * (
+                    1 if ci == component_index[over_id] else -1)
+            for sid in components[co]:
+                offsets[sid] = (BACK_RADIAL_PUSH + BACK_ORDERING_GAP) * (
+                    1 if co == component_index[over_id] else -1)
+            info['case'] = 'different-components'
+        else:
+            cyc = components[ci]
+            pos = {sid: j for j, sid in enumerate(cyc)}
+            j, k = sorted((pos[inner_id], pos[outer_id]))
+            if j == 0:
+                # The first birth is exceptional under the elder rule. There
+                # is no (j-1)-death pair to reorder. Keep all death levels
+                # distinct and choose a modest over/under displacement.
+                for rank, sid in enumerate(cyc):
+                    offsets[sid] = BACK_BASELINE_STAGGER * (rank - (len(cyc)-1)/2)
+                offsets[over_id] += BACK_RADIAL_PUSH
+                offsets[under_id] -= BACK_RADIAL_PUSH
+                info['case'] = 'elder-exception-heuristic'
+            else:
+                # Births indexed j,k (0-based); relevant deaths occupy
+                # positions j-1 and k-1. Low tier: outside the block;
+                # high tier: between the two middle deaths. Equation (7).
+                low = set(range(0, j-1)) | set(range(k, len(cyc)))
+                high = set(range(j, k-1))
+                middle_a, middle_b = cyc[j-1], cyc[k-1]
+                tier = BACK_RADIAL_PUSH + BACK_ORDERING_GAP
+                for idx in low:
+                    offsets[cyc[idx]] = -tier
+                for idx in high:
+                    offsets[cyc[idx]] = +tier
+                # For j<k: D_(j-1)>D_k iff birth j crosses over birth k.
+                j_sid = cyc[j]
+                j_over = (j_sid == over_id)
+                offsets[middle_a] = BACK_RADIAL_PUSH if j_over else -BACK_RADIAL_PUSH
+                offsets[middle_b] = -BACK_RADIAL_PUSH if j_over else BACK_RADIAL_PUSH
+                info.update(case='same-component-ordered',
+                            low=[cyc[t] for t in sorted(low)],
+                            high=[cyc[t] for t in sorted(high)],
+                            middle=[middle_a, middle_b],
+                            j=j, k=k)
+
+        half = width * BACK_BUMP_WIDTH_FACTOR
+        for sid in range(n):
+            back[sid].append(BackEvent(center + PI - half,
+                                       center + PI + half,
+                                       offsets[sid]))
+        info['offsets'] = dict(offsets)
+        ordering_info.append(info)
+
+    return BraidPlan(n=n, word=list(word), permutation=permutation,
+                     front=front, front_ends=[[e.b for e in es] for es in front],
+                     back=back, back_ends=[[e.b for e in es] for es in back],
+                     crossings=crossings, ordering_info=ordering_info)
 
 
 def lane_offset(lane, n):
@@ -242,7 +310,9 @@ def lane_offset(lane, n):
 
 def radius_and_height(plan, strand_id, theta):
     """Return (radius, z), with theta in [FRONT_BEGIN, FRONT_BEGIN+2*pi)."""
-    final_level = lane_offset(plan.permutation[strand_id], plan.n)
+    final_lane = plan.permutation[strand_id]
+    final_level = final_lane * LANE_SPACING  # Nonnegative outside front.
+    centered_level = lane_offset(final_lane, plan.n)
 
     # Region 1: the front, planar except for z bumps at crossings.
     if theta <= FRONT_END:
@@ -267,7 +337,7 @@ def radius_and_height(plan, strand_id, theta):
         if t >= 1.0:
             return CORE_RADIUS, final_level
         phi = 0.5 * PI * smooth5(t)
-        return CORE_RADIUS + final_level * math.cos(phi), final_level * math.sin(phi)
+        return CORE_RADIUS + centered_level * math.cos(phi), final_level * math.sin(phi)
 
     # Region 3: back, vertically stacked. Radial antipodal push/pull.
     if theta <= BACK_END:
@@ -277,7 +347,7 @@ def radius_and_height(plan, strand_id, theta):
         if k < len(events) and theta >= events[k].a:
             event = events[k]
             t = (theta - event.a) / (event.b - event.a)
-            r += event.radial_sign * BACK_RADIAL_PUSH * bump(t)
+            r += event.radial_offset * bump(t)
         return r, final_level
 
     # Region 4: second intermediate. Remain cylindrical most of the way,
@@ -288,7 +358,7 @@ def radius_and_height(plan, strand_id, theta):
         return CORE_RADIUS, final_level
     t = (theta - ramp_begin) / ramp_length
     phi = 0.5 * PI * (1.0 - smooth5(t))
-    return CORE_RADIUS + final_level * math.cos(phi), final_level * math.sin(phi)
+    return CORE_RADIUS + centered_level * math.cos(phi), final_level * math.sin(phi)
 
 
 def point_xyz(plan, strand_id, theta):
@@ -330,7 +400,8 @@ def sample_angles(plan, base_samples=None):
     add_window(FRONT_BEGIN, FULL_END, base_samples)
     for center, _inner, _outer, _sign, halfwidth in plan.crossings:
         add_window(center - halfwidth, center + halfwidth, SAMPLES_PER_CROSSING)
-        add_window(center + PI - halfwidth, center + PI + halfwidth,
+        back_halfwidth = halfwidth * BACK_BUMP_WIDTH_FACTOR
+        add_window(center + PI - back_halfwidth, center + PI + back_halfwidth,
                    SAMPLES_PER_CROSSING)
 
     first_ramp_end = FRONT_END + (BACK_BEGIN - FRONT_END) * TWIST_RAMP_FRACTION
@@ -471,19 +542,35 @@ def generate_edge_mesh(plan):
 
 
 def validate_geometry(plan, vertices, edges, components, vertex_spans):
-    # Front crossings have the prescribed positive/negative z separation;
-    # their antipodal copies have corresponding opposite radial shifts.
-    for center, inner, outer, sign, _halfwidth in plan.crossings:
+    # Check the prescribed tiers at every antipodal crossing center.
+    for event_idx, (center, inner, outer, sign, _width) in enumerate(plan.crossings):
         r1, z1 = radius_and_height(plan, inner, center)
         r2, z2 = radius_and_height(plan, outer, center)
-        assert abs(r1 - r2) < 1e-8, "Front crossing radial alignment failed"
-        assert abs(z1 - sign * CROSSING_HEIGHT) < 1e-8
-        assert abs(z2 + sign * CROSSING_HEIGHT) < 1e-8
-        br1, bz1 = radius_and_height(plan, inner, center + PI)
-        br2, bz2 = radius_and_height(plan, outer, center + PI)
-        assert abs(br1 - (CORE_RADIUS + sign * BACK_RADIAL_PUSH)) < 1e-8
-        assert abs(br2 - (CORE_RADIUS - sign * BACK_RADIAL_PUSH)) < 1e-8
-        assert abs(bz1 - bz2) >= LANE_SPACING - 1e-8
+        assert abs(r1-r2) < 1e-8
+        assert abs(z1-sign*CROSSING_HEIGHT) < 1e-8
+        assert abs(z2+sign*CROSSING_HEIGHT) < 1e-8
+        info = plan.ordering_info[event_idx]
+        radii = {sid: radius_and_height(plan, sid, center + PI)[0]
+                 for sid in range(plan.n)}
+        for sid, offset in info['offsets'].items():
+            assert abs(radii[sid] - CORE_RADIUS - offset) < 1e-8
+        if info['case'] == 'same-component-ordered':
+            da, db = info['middle']
+            for low in info['low']:
+                assert radii[low] < min(radii[da],radii[db])
+            for high in info['high']:
+                assert radii[high] > max(radii[da],radii[db])
+            j_id = next(c[info['j']] for c in link_cycles(plan.permutation)
+                        if da in c)
+            over = info['front_over'] == j_id
+            assert (radii[da] > radii[db]) == over
+
+    # Every strand must stay in z >= 0 outside the front crossing sector.
+    for strand in range(plan.n):
+        for j in range(1201):
+            theta = FRONT_END + (FULL_END - FRONT_END) * j / 1200
+            _r, z = radius_and_height(plan, strand, theta)
+            assert z >= -1e-10, (strand, theta, z)
 
     assert len(vertices) == len(edges)
     assert len(components) == len(vertex_spans)
@@ -524,7 +611,7 @@ def observation_point(plan, theta):
     outer_offset = 0.5 * (plan.n - 1) * LANE_SPACING
     distance = outer_offset + OBSERVATION_CLEARANCE
     r = CORE_RADIUS + distance * math.cos(phi)
-    z = distance * math.sin(phi)
+    z = ((plan.n - 1) * LANE_SPACING + OBSERVATION_CLEARANCE) * math.sin(phi)
     return (r * math.cos(theta), r * math.sin(theta), z)
 
 
@@ -571,7 +658,7 @@ def validate_observation(plan, vertices):
             assert abs(obs_r - (CORE_RADIUS + 0.5 * (plan.n - 1) *
                                 LANE_SPACING + OBSERVATION_CLEARANCE)) < 1e-8
         if FRONT_END + (BACK_BEGIN - FRONT_END)*TWIST_RAMP_FRACTION <= theta <= (FULL_END - (FULL_END - BACK_END)*TWIST_RAMP_FRACTION):
-            assert abs(obs_z - (0.5 * (plan.n - 1)*LANE_SPACING + OBSERVATION_CLEARANCE)) < 1e-8
+            assert abs(obs_z - ((plan.n - 1)*LANE_SPACING + OBSERVATION_CLEARANCE)) < 1e-8
         for strand in range(plan.n):
             r, z = radius_and_height(plan, strand, theta)
             separation = math.hypot(obs_r - r, obs_z - z)
@@ -621,6 +708,8 @@ def main():
         print("Observation loop: fixed front radius, fixed side/back height, smooth transition ramps")
         print("Observation loop:", len(observation_vertices), "vertices,",
               len(observation_edges), "edges, 0 faces")
+    print("Antipodal death-ordering cases:",
+          [item['case'] for item in plan.ordering_info])
     print("Braid word:", BRAID_WORD)
     print("Closure permutation (zero-based):", plan.permutation)
     print("Link components (strand IDs, zero-based):", components)
