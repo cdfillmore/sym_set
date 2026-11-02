@@ -19,12 +19,17 @@ Conventions:
     The braid travels with increasing theta around the positive z axis.
     Lanes are numbered 1..STRAND_COUNT, from inner to outer.
 
-The antipodal perturbations assign a radial target to EVERY back strand
-at each crossing. For same-component crossings away from the earliest birth,
-the ordering follows the three-tier inequalities (7) of Section 4.2.
-Crossings involving the earliest birth use a separate, explicit heuristic
-because the paper uses elder-rule surgery there. This script does NOT
-compute persistent homology or certify vineyard isotopy.
+The back assigns all death radial targets using equation (7), with the
+correct D_(j-1) and D_k indices, and rotates each component to its actual
+oldest front birth at each crossing. At radius 30, nonnegative and much
+smaller back bumps are essential: a large inward dip creates displaced
+far-side maxima and destroys the desired death ordering. For knots, an
+optional positive Markov stabilization adds an outer elder strand.
+
+The script also COMPUTES sampled 0-dimensional persistence of the generated
+edge mesh at the front crossing angles and reports the actual pairings and
+which vine passes over. This is a numerical diagnostic, not a proof that
+the full continuous vineyard is correct.
 """
 
 import math
@@ -41,20 +46,29 @@ except ImportError:
 # USER SETTINGS
 # =====================================================================
 
-# Always add an additional reidemeister twist to fix elder strand
 STRAND_COUNT = 4
-BRAID_WORD = [1, -2, 1, -2, 1, -2, 3]
-# Other examples:
-#   STRAND_COUNT = 2; BRAID_WORD = [1, 1, 1]    # trefoil
-#   STRAND_COUNT = 2; BRAID_WORD = [1, 1]       # Hopf link
-#   STRAND_COUNT = 4; BRAID_WORD = [1, -2, 3, 1]
+# Positive Markov stabilization adds one outer strand and one extra crossing
+# to a one-component knot without changing its link type. The added crossing
+# absorbs the inevitable elder-rule exception. For multi-component links,
+# stabilizations must be selected for each component separately.
+AUTO_STABILIZE_KNOT = True
+VERIFY_0D_PERSISTENCE = True
+BRAID_WORD = [1, -2, 1, -2, 1, -2, 3]  # Closure is a figure-eight knot.
 
-CORE_RADIUS = 20
-LANE_SPACING = 1.0
-CROSSING_HEIGHT = 0.1  # Each front participant rises/falls this far.
-BACK_RADIAL_PUSH = 5.0  # Each paired back participant moves +/- this far.
-BACK_ORDERING_GAP = 0.36  # Difference between middle and high/low death tiers.
-BACK_BASELINE_STAGGER = 0.1  # Break near-equal death values between crossings.
+# Radius 30: to retain local antipodal maxima, back radial displacements
+# must be SMALL compared with R * (angular separation between crossings)^2.
+# Earlier signed -0.52 .. +0.52 bumps created distance maxima at neighbouring
+# antipodal crossings, even though the exact-center radii were correctly ordered.
+CORE_RADIUS = 30.0
+LANE_SPACING = 0.42
+CROSSING_HEIGHT = 0.27  # Each front participant rises/falls this far.
+# ALL BACK OFFSETS ARE NONNEGATIVE. The four levels for ordinary crossings are:
+# low = 0; middle A/B = GAP or GAP+2*PUSH; high = 2*(PUSH+GAP).
+# Positive bumps avoid inward valleys whose two shoulders become the REAL
+# death maxima. These values were tested at R=30 for the default braid.
+BACK_RADIAL_PUSH = 0.025  # Half the separation of the middle death pair.
+BACK_ORDERING_GAP = 0.050  # Separates the middle pair from low and high tiers.
+BACK_BASELINE_STAGGER = 0.0025  # Very small generic offsets for elder crossings.
 BACK_BUMP_WIDTH_FACTOR = 1.30  # Wider antipodal bumps, without overlap.
 
 # Four angular regions, with angle zero pointing along +x:
@@ -91,7 +105,7 @@ OBJECT_NAME = "BraidingVineyards_EdgeOnly"
 # front: radially outside; middle: rotates with the strands; back: ABOVE
 # the vertically stacked strands. It remains exterior to the strand envelope.
 CREATE_OBSERVATION_LOOP = True
-OBSERVATION_CLEARANCE = 2.0
+OBSERVATION_CLEARANCE = 0.55
 OBSERVATION_VERTEX_COUNT = 720
 OBSERVATION_OBJECT_NAME = "BraidingVineyards_ObservationLoop"
 # Soft-maximum sharpness (in inverse spatial units); guarantees that the
@@ -100,7 +114,6 @@ OBSERVATION_OBJECT_NAME = "BraidingVineyards_ObservationLoop"
 # The front is a circle at a fixed radius; the sides/back are at fixed z.
 OBSERVATION_ENVELOPE_SHARPNESS = 45.0  # Legacy setting, no longer used.
 SAVE_BLEND_PATH = ""  # Optional: e.g. "//braiding_vineyards.blend"
-
 
 
 # =====================================================================
@@ -200,96 +213,120 @@ def check_settings():
 
 
 def compile_braid(n, word):
-    """Track braid permutation and prescribe every antipodal death level.
+    """Build exact braid closure and antipodal death-ordering constraints.
 
-    At a crossing between births j<k on the SAME component, assume death
-    D_i corresponds to the arc immediately after the i-th birth when walking
-    along that component. The crossing pair in the vineyard then comprises
-    D_(j-1) and D_k, with other deaths partitioned as inequality (7).
+    At each crossing, rotate each same-component cyclic birth order so that
+    its FIRST birth is the outermost strand at that front angle. Under the
+    hypotheses of the paper, D_i belongs to the arc from birth i to i+1.
 
-    The pairing assumption is a combinatorial design choice, NOT a persistence
-    computation. The elder birth (j=0) is handled separately.
+    For zero-based birth indices j < k, equation (7) specifies:
+        low:    D[0 : j-1], D[k+1 : N]
+        middle: D[j-1], D[k]
+        high:   D[j : k]
+    The earlier script incorrectly used D[k-1] rather than D[k].
     """
     front = [[] for _ in range(n)]
     back = [[] for _ in range(n)]
     lane_to_strand = list(range(n))
     crossings = []
-
     angular_slot = (FRONT_END - FRONT_BEGIN) / (len(word) + 1)
     halfwidth = 0.5 * CROSSING_SLOT_FRACTION * angular_slot
-    for event_index, g in enumerate(word):
-        lane = abs(g) - 1
-        sign = 1 if g > 0 else -1
-        inner_id = lane_to_strand[lane]
-        outer_id = lane_to_strand[lane + 1]
+
+    for event_index, generator in enumerate(word):
+        lane = abs(generator) - 1
+        sign = 1 if generator > 0 else -1
+        inner_id, outer_id = lane_to_strand[lane:lane + 2]
         center = FRONT_BEGIN + (event_index + 1) * angular_slot
         a, b = center - halfwidth, center + halfwidth
         front[inner_id].append(FrontEvent(a, b, lane, lane + 1, sign))
         front[outer_id].append(FrontEvent(a, b, lane + 1, lane, -sign))
         crossings.append((center, inner_id, outer_id, sign, halfwidth))
-        lane_to_strand[lane], lane_to_strand[lane + 1] = (
-            lane_to_strand[lane + 1], lane_to_strand[lane])
+        lane_to_strand[lane], lane_to_strand[lane + 1] = outer_id, inner_id
 
     permutation = [None] * n
-    for ending_lane, start_id in enumerate(lane_to_strand):
-        permutation[start_id] = ending_lane
+    for ending_lane, sid in enumerate(lane_to_strand):
+        permutation[sid] = ending_lane
     components = link_cycles(permutation)
-    component_index = {sid: c for c, cyc in enumerate(components) for sid in cyc}
+    component_index = {sid: c for c, comp in enumerate(components)
+                       for sid in comp}
     ordering_info = []
 
-    for center, inner_id, outer_id, sign, width in crossings:
-        offsets = {sid: BACK_BASELINE_STAGGER * (sid - 0.5*(n-1))
-                   for sid in range(n)}
+    # Replay the front lane positions so the earliest birth is identified
+    # at the ACTUAL observation angle, rather than using the arbitrary
+    # first index of link_cycles().
+    live_lanes = list(range(n))
+    for event_index, (center, inner_id, outer_id, sign, width) in enumerate(crossings):
+        lane = abs(word[event_index]) - 1
+        sid_to_lane = {sid: j for j, sid in enumerate(live_lanes)}
         over_id = inner_id if sign > 0 else outer_id
         under_id = outer_id if sign > 0 else inner_id
         ci, co = component_index[inner_id], component_index[outer_id]
-        info = {'angle': center, 'front_over': over_id, 'front_under': under_id}
+        # Every back deformation is OUTWARD relative to CORE_RADIUS.
+        # A nonzero generic baseline is used for non-participating strands.
+        tier = BACK_RADIAL_PUSH + BACK_ORDERING_GAP
+        offsets = {sid: tier + BACK_BASELINE_STAGGER * (
+                   sid - 0.5 * (n-1)) for sid in range(n)}
+        info = {'angle': center, 'front_over': over_id,
+                'front_under': under_id, 'original_crossing_index': event_index}
+
         if ci != co:
-            # Different components: all their death values are ordered, as
-            # described in the easier case on page 29 of the paper.
+            # The easier, between-component case from p. 29.
             for sid in components[ci]:
-                offsets[sid] = (BACK_RADIAL_PUSH + BACK_ORDERING_GAP) * (
-                    1 if ci == component_index[over_id] else -1)
+                offsets[sid] = 2.0 * tier if ci == component_index[over_id] else 0.0
             for sid in components[co]:
-                offsets[sid] = (BACK_RADIAL_PUSH + BACK_ORDERING_GAP) * (
-                    1 if co == component_index[over_id] else -1)
+                offsets[sid] = 2.0 * tier if co == component_index[over_id] else 0.0
             info['case'] = 'different-components'
         else:
-            cyc = components[ci]
-            pos = {sid: j for j, sid in enumerate(cyc)}
-            j, k = sorted((pos[inner_id], pos[outer_id]))
+            cycle = components[ci]
+            # Crossing participants have the same front radius at the exact
+            # crossing center; other strands remain on their strict lane.
+            effective_lane = {sid: float(sid_to_lane[sid]) for sid in cycle}
+            effective_lane[inner_id] = lane + 0.5
+            effective_lane[outer_id] = lane + 0.5
+            oldest = max(cycle, key=lambda sid: effective_lane[sid])
+            rotated = cycle[cycle.index(oldest):] + cycle[:cycle.index(oldest)]
+            position = {sid: j for j, sid in enumerate(rotated)}
+            j, k = sorted((position[inner_id], position[outer_id]))
+            info.update(oldest=oldest, rotated_component=list(rotated), j=j, k=k)
+
             if j == 0:
-                # The first birth is exceptional under the elder rule. There
-                # is no (j-1)-death pair to reorder. Keep all death levels
-                # distinct and choose a modest over/under displacement.
-                for rank, sid in enumerate(cyc):
-                    offsets[sid] = BACK_BASELINE_STAGGER * (rank - (len(cyc)-1)/2)
+                # The first birth is exchanging at this crossing. The paper
+                # treats it by elder-rule surgery, not equation (7).
+                # With Markov stabilization, only the ADDED crossing should
+                # fall into this case for a one-component input knot.
+                for index, sid in enumerate(rotated):
+                    offsets[sid] = tier + BACK_BASELINE_STAGGER * (
+                        index - (len(rotated)-1)/2)
                 offsets[over_id] += BACK_RADIAL_PUSH
                 offsets[under_id] -= BACK_RADIAL_PUSH
-                info['case'] = 'elder-exception-heuristic'
+                info['case'] = 'elder-surgery-crossing'
             else:
-                # Births indexed j,k (0-based); relevant deaths occupy
-                # positions j-1 and k-1. Low tier: outside the block;
-                # high tier: between the two middle deaths. Equation (7).
-                low = set(range(0, j-1)) | set(range(k, len(cyc)))
-                high = set(range(j, k-1))
-                middle_a, middle_b = cyc[j-1], cyc[k-1]
-                tier = BACK_RADIAL_PUSH + BACK_ORDERING_GAP
-                for idx in low:
-                    offsets[cyc[idx]] = -tier
-                for idx in high:
-                    offsets[cyc[idx]] = +tier
-                # For j<k: D_(j-1)>D_k iff birth j crosses over birth k.
-                j_sid = cyc[j]
-                j_over = (j_sid == over_id)
-                offsets[middle_a] = BACK_RADIAL_PUSH if j_over else -BACK_RADIAL_PUSH
-                offsets[middle_b] = -BACK_RADIAL_PUSH if j_over else BACK_RADIAL_PUSH
+                low = set(range(0, j-1)) | set(range(k+1, len(rotated)))
+                high = set(range(j, k))
+                middle_a = rotated[j-1]  # D_(j-1) zero based
+                middle_b = rotated[k]    # D_k, NOT D_(k-1)
+                for t in low:
+                    offsets[rotated[t]] = 0.0
+                for t in high:
+                    offsets[rotated[t]] = 2.0 * tier
+                j_over = (rotated[j] == over_id)
+                offsets[middle_a] = (tier + BACK_RADIAL_PUSH
+                                     if j_over else tier - BACK_RADIAL_PUSH)
+                offsets[middle_b] = (tier - BACK_RADIAL_PUSH
+                                     if j_over else tier + BACK_RADIAL_PUSH)
                 info.update(case='same-component-ordered',
-                            low=[cyc[t] for t in sorted(low)],
-                            high=[cyc[t] for t in sorted(high)],
+                            low=[rotated[t] for t in sorted(low)],
+                            high=[rotated[t] for t in sorted(high)],
                             middle=[middle_a, middle_b],
-                            j=j, k=k)
+                            j_strand=rotated[j])
 
+        # Break incidental ties INSIDE a tier. The offsets distinguish all
+        # physical death critical points, not only the distinguished pair.
+        # Keep the perturbation far smaller than the middle-pair gap.
+        for sid in range(n):
+            offsets[sid] += BACK_BASELINE_STAGGER * sid
+        if any(v < -1e-12 for v in offsets.values()):
+            raise ValueError("Negative back offset: expected outward-only perturbations")
         half = width * BACK_BUMP_WIDTH_FACTOR
         for sid in range(n):
             back[sid].append(BackEvent(center + PI - half,
@@ -297,6 +334,8 @@ def compile_braid(n, word):
                                        offsets[sid]))
         info['offsets'] = dict(offsets)
         ordering_info.append(info)
+        live_lanes[lane], live_lanes[lane+1] = (
+            live_lanes[lane+1], live_lanes[lane])
 
     return BraidPlan(n=n, word=list(word), permutation=permutation,
                      front=front, front_ends=[[e.b for e in es] for es in front],
@@ -492,6 +531,7 @@ def resample_component(plan, component, parameters, arc_lengths, count):
     """
     total_length = arc_lengths[-1]
     points = []
+    strand_labels = []
     for vertex_index in range(count):
         desired_s = total_length * vertex_index / count
         k = bisect_right(arc_lengths, desired_s) - 1
@@ -504,7 +544,8 @@ def resample_component(plan, component, parameters, arc_lengths, count):
         turn = min(int(parameter / (2.0 * PI)), len(component) - 1)
         theta = FRONT_BEGIN + (parameter - turn * 2.0 * PI)
         points.append(point_xyz(plan, component[turn], theta))
-    return points
+        strand_labels.append(component[turn])
+    return points, strand_labels
 
 
 def generate_edge_mesh(plan):
@@ -526,19 +567,22 @@ def generate_edge_mesh(plan):
 
     vertices = []
     edges = []
+    strand_labels = []
     vertex_spans = []
     for component, (parameters, arc_lengths), count in zip(
             components, dense_data, component_counts):
         first = len(vertices)
-        vertices.extend(resample_component(plan, component, parameters,
-                                           arc_lengths, count))
+        component_vertices, component_labels = resample_component(
+            plan, component, parameters, arc_lengths, count)
+        vertices.extend(component_vertices)
+        strand_labels.extend(component_labels)
         last = len(vertices)
         edges.extend((i, i + 1) for i in range(first, last - 1))
         edges.append((last - 1, first))
         vertex_spans.append((first, last))
 
     assert len(vertices) == TARGET_VERTEX_COUNT
-    return vertices, edges, components, vertex_spans, component_lengths
+    return vertices, edges, components, vertex_spans, component_lengths, strand_labels
 
 
 def validate_geometry(plan, vertices, edges, components, vertex_spans):
@@ -553,6 +597,7 @@ def validate_geometry(plan, vertices, edges, components, vertex_spans):
         radii = {sid: radius_and_height(plan, sid, center + PI)[0]
                  for sid in range(plan.n)}
         for sid, offset in info['offsets'].items():
+            assert offset >= -1e-12, (event_idx, sid, offset)
             assert abs(radii[sid] - CORE_RADIUS - offset) < 1e-8
         if info['case'] == 'same-component-ordered':
             da, db = info['middle']
@@ -560,9 +605,7 @@ def validate_geometry(plan, vertices, edges, components, vertex_spans):
                 assert radii[low] < min(radii[da],radii[db])
             for high in info['high']:
                 assert radii[high] > max(radii[da],radii[db])
-            j_id = next(c[info['j']] for c in link_cycles(plan.permutation)
-                        if da in c)
-            over = info['front_over'] == j_id
+            over = info['front_over'] == info['j_strand']
             assert (radii[da] > radii[db]) == over
 
     # Every strand must stay in z >= 0 outside the front crossing sector.
@@ -665,6 +708,123 @@ def validate_observation(plan, vertices):
             assert separation >= OBSERVATION_CLEARANCE - 1e-8, (i, strand, separation)
 
 
+
+def diagnose_vineyard_0d(plan, vertices, edges, components, spans, strand_labels,
+                          original_crossing_count=None):
+    """Numerical 0D persistence of the generated POLYLINE using distance.
+
+    For every edge, insert its closest point to the observer when the
+    closest point is interior to the segment. This is important: simply
+    using vertex distances (the naive lower-star filtration) badly aliases
+    near-side births on a large-radius circle with a limited vertex budget.
+    The inserted points are only for verification, NOT extra Blender vertices.
+    NOTE: a per-crossing sign check is a NECESSARY LOCAL TEST, not sufficient
+    to show the correct global vineyard sublink. Some extra pairs are allowed.
+
+    A polygonal approximation to a smooth circle can also create tiny
+    antipodal persistence pairs; count these as extra, but assess the signs
+    using the true front-born persistence features.
+    """
+    if original_crossing_count is None:
+        original_crossing_count = len(plan.crossings)
+    print('\nDistance-to-edge polyline H0 diagnostic (not vertex-only PH):')
+    num_base = len(vertices)
+    summary = []
+    for event_index, (theta, inner, outer, sign, _width) in enumerate(plan.crossings):
+        obs = observation_point(plan, theta)
+        values = [math.dist(x, obs) for x in vertices]
+        labels = list(strand_labels)
+        augmented_edges = []
+        for a, b in edges:
+            va, vb = vertices[a], vertices[b]
+            step = tuple(vb[t] - va[t] for t in range(3))
+            sq_len = sum(t*t for t in step)
+            f = sum((obs[t] - va[t])*step[t] for t in range(3)) / sq_len
+            if 1.e-8 < f < 1.-1.e-8:
+                projected = tuple(va[t] + f*step[t] for t in range(3))
+                mid = len(values)
+                values.append(math.dist(projected, obs))
+                labels.append(labels[a])
+                augmented_edges.append((a, mid))
+                augmented_edges.append((mid, b))
+            else:
+                augmented_edges.append((a, b))
+        size = len(values)
+        neighbors = [[] for _ in range(size)]
+        for a, b in augmented_edges:
+            neighbors[a].append(b)
+            neighbors[b].append(a)
+        parent = list(range(size))
+        creation = list(range(size))
+        active = bytearray(size)
+        pairs = []
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for v in sorted(range(size), key=lambda i: (values[i], i)):
+            active[v] = 1
+            roots = list(dict.fromkeys(find(neighbor) for neighbor in neighbors[v]
+                                       if active[neighbor]))
+            if not roots:
+                continue
+            oldest = min(roots, key=lambda r: (values[creation[r]], creation[r]))
+            parent[v] = oldest
+            for r in roots:
+                if r != oldest:
+                    pairs.append((creation[r], v))
+                    parent[r] = oldest
+
+        # Essential H0 class on each connected component: extended pairing
+        # to its global maximum. This is appropriate to H0 on a closed curve.
+        # In practice the maxima are at original polygon vertices.
+        for start, stop in spans:
+            component_vertices = list(range(start, stop))
+            # Interior edge minima can be even earlier than vertex minima.
+            # Trace the component by the original vertices' strand labels;
+            # the global smallest of augmented points in its edge span is
+            # obtained by these original vertex indices plus edge-point labels.
+            comp_ids = set(strand_labels[start:stop])
+            candidates = [i for i, sid in enumerate(labels) if sid in comp_ids]
+            oldest = min(candidates, key=lambda i: (values[i], i))
+            greatest = max(candidates, key=lambda i: (values[i], i))
+            pairs.append((oldest, greatest))
+
+        # The near-side birth-death classes are separated from far-side tiny
+        # polygonal-artifact classes by the major-radius-scale distance gap.
+        front = [(a, b) for a, b in pairs if values[a] < 0.5 * CORE_RADIUS]
+        death_by_strand = {}
+        duplicates = set()
+        for a, b in front:
+            sid = labels[a]
+            if sid in death_by_strand:
+                duplicates.add(sid)
+            death_by_strand[sid] = (values[a], values[b], labels[b])
+        over = inner if sign > 0 else outer
+        under = outer if sign > 0 else inner
+        gap = (death_by_strand[over][1] - death_by_strand[under][1]
+               if over in death_by_strand and under in death_by_strand
+               else float('nan'))
+        valid = (len(front) == plan.n and not duplicates and gap > 1e-4)
+        status = 'PASS' if valid else 'CHECK'
+        if event_index >= original_crossing_count:
+            status = 'ELDER / ADDED CROSSING'
+        extra = len(pairs) - plan.n
+        print('  crossing {:>2}  angle={:>6.2f}deg  front_pairs={}/{}'
+              '  extra_far_pairs={}  death(over)-death(under)={:+.6f}  {}'.format(
+                  event_index+1, math.degrees(theta), len(front), plan.n,
+                  extra, gap, status))
+        if status == 'CHECK':
+            print('     actual front pairs by strand:',
+                  {k: (round(v[0], 5), round(v[1], 5), v[2])
+                   for k, v in sorted(death_by_strand.items())})
+        summary.append((status, len(front), extra, gap))
+    return summary
+
+
 def create_blender_object(vertices, edges, plan, components):
     if bpy is None:
         return None
@@ -698,9 +858,38 @@ def create_blender_object(vertices, edges, plan, components):
 
 def main():
     check_settings()
-    plan = compile_braid(STRAND_COUNT, BRAID_WORD)
-    verts, edges, components, spans, lengths = generate_edge_mesh(plan)
+    original_word_length = len(BRAID_WORD)
+    effective_n, effective_word = STRAND_COUNT, list(BRAID_WORD)
+    if AUTO_STABILIZE_KNOT:
+        unstabilized = compile_braid(STRAND_COUNT, BRAID_WORD)
+        original_components = link_cycles(unstabilized.permutation)
+        if len(original_components) == 1:
+            effective_word = list(BRAID_WORD) + [STRAND_COUNT]
+            effective_n = STRAND_COUNT + 1
+            print('Positive Markov stabilization: added outer strand and '
+                  'one sacrificial elder crossing (unchanged knot type).')
+        else:
+            print('WARNING: multiple components: automatic per-component Markov '
+                  'stabilizations are not implemented. Elder crossings may remain.')
+    plan = compile_braid(effective_n, effective_word)
+    # Diagnostic for interference between neighbouring antipodal bumps.
+    # For near-equal observation/back radii, angular separation dtheta costs
+    # roughly CORE_RADIUS*dtheta**2/4 in distance to the observation point.
+    # This is a heuristic guardrail, not a proof of local Morse structure.
+    slot = (FRONT_END - FRONT_BEGIN) / (len(effective_word) + 1)
+    near_neighbor_penalty = CORE_RADIUS * slot * slot / 4.0
+    largest_bump = max(e.radial_offset for events in plan.back for e in events)
+    if largest_bump > 0.8 * near_neighbor_penalty:
+        print("WARNING: antipodal offsets may be too large relative to "
+              "crossing separation; decrease BACK_RADIAL_PUSH / "
+              "BACK_ORDERING_GAP or increase CORE_RADIUS.")
+        print("  Largest back offset={:.6f}; adjacent-center angular penalty"
+              "={:.6f}".format(largest_bump,near_neighbor_penalty))
+    verts, edges, components, spans, lengths, labels = generate_edge_mesh(plan)
     validate_geometry(plan, verts, edges, components, spans)
+    if VERIFY_0D_PERSISTENCE:
+        diagnose_vineyard_0d(plan, verts, edges, components, spans, labels,
+                             original_crossing_count=original_word_length)
     obj = create_blender_object(verts, edges, plan, components)
     if CREATE_OBSERVATION_LOOP:
         observation_obj, observation_vertices, observation_edges = create_observation_loop(plan)
@@ -710,7 +899,8 @@ def main():
               len(observation_edges), "edges, 0 faces")
     print("Antipodal death-ordering cases:",
           [item['case'] for item in plan.ordering_info])
-    print("Braid word:", BRAID_WORD)
+    print("Input braid word:", BRAID_WORD)
+    print("Generated braid word:", effective_word)
     print("Closure permutation (zero-based):", plan.permutation)
     print("Link components (strand IDs, zero-based):", components)
     print("Vertices per link component:", [b - a for a, b in spans])
